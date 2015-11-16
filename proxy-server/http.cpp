@@ -7,11 +7,14 @@
 //
 
 #include <string.h>
+#include <utility>
 
 //this method makes request ready for call
-char* parse_http_request(char* request) {
+//first result is string for doing request, second result is url to server, which we will connect
+std::pair<char*, char*> parse_get_request(char* request) {
     char* tokens = strtok(request, " \r\n");
     char* result = new char[0];
+    char* site = new char[0];
     
     while (tokens) {
         strcat(result, tokens);
@@ -19,6 +22,7 @@ char* parse_http_request(char* request) {
         
         if (strcmp(tokens, "GET") == 0) {
             tokens = strtok(nullptr, " \r\n");
+            strcpy(site, tokens);
             strcat(result, tokens);
             strcat(result, " ");
             tokens = strtok(nullptr, " \r\n");
@@ -35,7 +39,7 @@ char* parse_http_request(char* request) {
         tokens = strtok(nullptr, " \r\n");
     }
     
-    return result;
+    return std::make_pair(result, site);
 }
 
-//TODO: Do we need to parse other requests like POST and so on
+//TODO: Do we need to parse other requests like POST and so on?

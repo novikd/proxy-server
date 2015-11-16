@@ -15,7 +15,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "16"
             endingLineNumber = "16"
-            landmarkName = "parse_http_request(char* request)"
+            landmarkName = "parse_get_request(char* request)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
