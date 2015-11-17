@@ -55,8 +55,27 @@ struct ipv4_endpoint {
     uint16_t port;
 };
 
+int init_socket(int port) {
+    int sock = socket(PF_INET, SOCK_STREAM, 0);
+    
+    sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+    
+    int binded = bind(sock, (sockaddr*) &addr, sizeof(addr));
+    
+    if (binded == -1) {
+        perror("Binding arror occured!\n");
+    }
+    
+    listen(sock, SOMAXCONN);
+    
+    return sock;
+}
+
 //This method will be run in another thread to make resolving non-blocking
-//TODO: implement it, make it non-blocking
+//TODO: implement it, make it non-blockingю May be I should make it an anonymous function?
 void resolve_dns(char* name) {
     struct hostent* addr;
     if ((addr = gethostbyname(name)) == nullptr) {
@@ -64,46 +83,3 @@ void resolve_dns(char* name) {
     }
     char* link = addr->h_addr;
 }
-
-struct events_queue {
-    
-    events_queue() :
-        kq()
-    {
-        
-    }
-    
-    //this method adds to kqueue event, which listens to other events
-    //may be it should also get predicate to be called and std::function, which should be executeded ? Do we need it's identificator?
-    void add_listener(struct kevent kev);
-    
-    void add_event(struct kevent kev);
-    
-    bool event_occured() {
-        return kevent(kq, nullptr, 0, event_list, SOMAXCONN, nullptr) != 0;
-    }
-    
-    void execute() {
-        int amount = kevent(kq, nullptr, 0, event_list, SOMAXCONN, nullptr);
-        
-        if (amount == -1) {
-            perror("Getting number of events error!\n");
-        }
-        
-        //TODO: To call event's functions
-    }
-    
-    int get_flags(int i) {
-        return event_list[i].flags;
-    }
-    
-    uintptr_t get_ident(int i) {
-        return event_list[i].ident;
-    }
-    
-    //TODO: Save all functions and their identificators
-    
-private:
-    int kq;
-    struct kevent event_list[SOMAXCONN];
-};
