@@ -20,7 +20,7 @@
 struct events_queue {
     
     events_queue() :
-    kq(kqueue())
+        kq(kqueue())
     {
         
     }
@@ -28,6 +28,7 @@ struct events_queue {
     //this method adds to kqueue event, which listens to other events
     //may be it should also get predicate to be called and std::function, which should be executeded ? Do we need it's identificator?
     //How should I save arguments!? Map or they must have different identificators?
+    //TODO:: Remove std::function from function signature
     void add_listener(struct kevent kev, std::function<bool(struct kevent)> predicate, std::function<void(struct kevent)> operation) {
         if (kevent(kq, &kev, 1, nullptr, 0, nullptr) != -1) {
             predicates.push_back(predicate);
@@ -37,14 +38,13 @@ struct events_queue {
         }
     }
     
-    void add_event(struct kevent kev) {
-        if (kevent(kq, &kev, 1, nullptr, 0, nullptr) == -1) {
-            perror("Adding new kevent error!\n");
-        }
+    //TODO: Create a kevent inside the function! Function should get only params for kevent(...) .
+    int add_event(struct kevent& kev) {
+        return kevent(kq, &kev, 1, nullptr, 0, nullptr);
     }
     
     bool event_occured() {
-        return kevent(kq, nullptr, 0, event_list, SOMAXCONN, nullptr) != 0;
+        return kevent(kq, nullptr, 0, event_list, SOMAXCONN, nullptr) > 0;
     }
     
     void execute() {

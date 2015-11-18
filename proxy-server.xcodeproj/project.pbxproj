@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3C015F261BFCDD8800A4C492 /* server.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C015F251BFCDD8800A4C492 /* server.cpp */; };
 		3C0BBDC61BFBBCC500BB5335 /* event_queue.h in Sources */ = {isa = PBXBuildFile; fileRef = 3C0BBDC41BFBBBEE00BB5335 /* event_queue.h */; };
 		3C5CEF771BF8CBCA0059B51A /* http.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C5CEF761BF8CBCA0059B51A /* http.cpp */; };
-		3C823FF21BF7D18C00A7BB1B /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C823FF11BF7D18C00A7BB1B /* main.cpp */; };
 		3C823FF91BF7DCE900A7BB1B /* networking.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C823FF81BF7DCE900A7BB1B /* networking.cpp */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +26,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3C015F251BFCDD8800A4C492 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = server.cpp; sourceTree = "<group>"; };
 		3C0BBDC41BFBBBEE00BB5335 /* event_queue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = event_queue.h; sourceTree = "<group>"; };
 		3C5CEF761BF8CBCA0059B51A /* http.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = http.cpp; sourceTree = "<group>"; };
 		3C823FEE1BF7D18C00A7BB1B /* proxy-server */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "proxy-server"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -67,6 +68,7 @@
 				3C823FF81BF7DCE900A7BB1B /* networking.cpp */,
 				3C5CEF761BF8CBCA0059B51A /* http.cpp */,
 				3C0BBDC41BFBBBEE00BB5335 /* event_queue.h */,
+				3C015F251BFCDD8800A4C492 /* server.cpp */,
 			);
 			path = "proxy-server";
 			sourceTree = "<group>";
@@ -128,8 +130,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				3C0BBDC61BFBBCC500BB5335 /* event_queue.h in Sources */,
-				3C823FF21BF7D18C00A7BB1B /* main.cpp in Sources */,
 				3C823FF91BF7DCE900A7BB1B /* networking.cpp in Sources */,
+				3C015F261BFCDD8800A4C492 /* server.cpp in Sources */,
 				3C5CEF771BF8CBCA0059B51A /* http.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

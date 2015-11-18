@@ -22,12 +22,6 @@ void exitor(int param) {
 
 //this file for testing
 int main() {
-    
-//    char str[] = "GET http://www.site.ru/news.html?login=Petya%20Vasechkin&password=qq HTTP/1.0\r\nHost: www.site.ru\r\nReferer: http://www.site.ru/index.html\r\nCookie: income=1\r\n\r\n";
-    
-    //char* request = parse_http_request(str);
-    
-    //std::cout << request;
 
     main_socket = init_socket(2539);
     
@@ -44,21 +38,21 @@ int main() {
             int fd = static_cast<int>(event.ident);
             struct kevent kev;
             EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
-            if (kevent(queue.get_queue(), &kev, 1, nullptr, 0, nullptr) == -1) {
+            if (queue.add_event(kev) == -1) {
                 perror("Deleting error occured!\n");
             }
             close(fd);
         } else if (event.ident == main_socket) {
             sockaddr_in addr;
             socklen_t size = sizeof(addr);
-            int fd = accept(static_cast<int>(event.ident), (sockaddr*) &addr, &size);
+            int fd = accept(main_socket, (sockaddr*) &addr, &size);
             
             if (fd == -1) {
                 perror("Connection error occured!\n");
             }
             struct kevent kev;
             EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, nullptr);
-            kevent(queue.get_queue(), &kev, 1, nullptr, 0, nullptr);
+            queue.add_event(kev);
             send(fd, "Welcome!\n", 9, 0);
         } else if (event.flags & EVFILT_READ) {
             int fd = static_cast<int>(event.ident);
