@@ -33,6 +33,10 @@ struct ipv4_adress {
         inet_aton(link, &addr);
     }
     
+    in_addr get_addr() {
+        return addr;
+    }
+    
     in_addr addr;
 };
 

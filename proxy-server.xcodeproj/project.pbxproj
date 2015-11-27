@@ -32,6 +32,8 @@
 		3C823FEE1BF7D18C00A7BB1B /* proxy-server */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "proxy-server"; sourceTree = BUILT_PRODUCTS_DIR; };
 		3C823FF11BF7D18C00A7BB1B /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		3C823FF81BF7DCE900A7BB1B /* networking.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = networking.cpp; sourceTree = "<group>"; };
+		3CA1016D1BFDCBB5001F325F /* http.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = http.h; sourceTree = "<group>"; };
+		3CB6ED341C08B29000D1809F /* networking.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = networking.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +70,8 @@
 				3C823FF81BF7DCE900A7BB1B /* networking.cpp */,
 				3C5CEF761BF8CBCA0059B51A /* http.cpp */,
 				3C0BBDC41BFBBBEE00BB5335 /* event_queue.h */,
+				3CB6ED341C08B29000D1809F /* networking.h */,
+				3CA1016D1BFDCBB5001F325F /* http.h */,
 				3C015F251BFCDD8800A4C492 /* server.cpp */,
 			);
 			path = "proxy-server";

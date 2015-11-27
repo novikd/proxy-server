@@ -9,21 +9,46 @@
 #ifndef event_queue_h
 #define event_queue_h
 
+#define EVLIST_SIZE 512
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/event.h>
 #include <sys/socket.h>
 #include <vector>
+#include <map>
 #include <functional>
 #include <netinet/in.h> // sockaddr_in
+
+//Зачем при добавлении листнера кивент? Он не нужен, додуматься, как сделать идентификатор для обработчика, чтобы всё хранить в дереве(set, map).
+//Идентификатор ивента и фильтр
+
+typedef std::function<void(struct kevent)> funct_t;
+
+struct holder {
+    
+    holder(const struct kevent& event) :
+        ident(event.ident),
+        filter(event.filter)
+    {}
+    
+    bool operator==(const holder& other) const {
+        return ident == other.ident && filter == other.filter;
+    }
+    
+    bool operator<(const holder& other) const {
+        return ident < other.ident || (ident == other.ident && filter < other.filter);
+    }
+    
+    uintptr_t ident;
+    int16_t filter;
+};
 
 struct events_queue {
     
     events_queue() :
         kq(kqueue())
-    {
-        
-    }
+    {}
     
     //this method adds to kqueue event, which listens to other events
     //may be it should also get predicate to be called and std::function, which should be executeded ? Do we need it's identificator?
@@ -38,17 +63,31 @@ struct events_queue {
         }
     }
     
+    void add_listener(uintptr_t ident, int16_t filter, std::function<void(struct kevent)> f) {
+        tmp_handlers[std::make_pair(ident, filter)] = f;
+    }
+    
+    void add_listener(holder event_holder, funct_t handler) {
+        handlers[event_holder] = handler;
+    }
+    
     //TODO: Create a kevent inside the function! Function should get only params for kevent(...) .
-    int add_event(struct kevent& kev) {
+    int add_event(const struct kevent& kev) {
         return kevent(kq, &kev, 1, nullptr, 0, nullptr);
     }
     
-    bool event_occured() {
-        return kevent(kq, nullptr, 0, event_list, SOMAXCONN, nullptr) > 0;
+    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata) {
+        struct kevent kev;
+        EV_SET(&kev, ident, filter, flags, fflags, data, udata);
+        return kevent(kq, &kev, 1, nullptr, 0, nullptr);
+    }
+    
+    int occured() {
+        return kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
     }
     
     void execute() {
-        int amount = kevent(kq, nullptr, 0, event_list, SOMAXCONN, nullptr);
+        int amount = kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
         
         if (amount == -1) {
             perror("Getting number of events error!\n");
@@ -65,25 +104,34 @@ struct events_queue {
         }
     }
     
-    int get_flags(int i) {
-        return event_list[i].flags;
-    }
-    
-    uintptr_t get_ident(int i) {
-        return event_list[i].ident;
-    }
-    
-    int get_queue() {
-        return kq;
+    void run() {
+        while (true) {
+            int amount = kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
+            
+            if (amount == -1) {
+                perror("Kqueue error! Can't to get amount of events\n");
+            }
+            for (int i = 0; i < amount; ++i) {
+                auto it = handlers.find({event_list[i]});
+                
+                if (it == handlers.end()) {
+                    perror("Can't find handler for event\n");
+                    continue;
+                }
+                
+                it->second(event_list[i]);
+            }
+        }
     }
     
     //TODO: Save all functions and their identificators
     //Should I use std::function or pointers to functions.
 private:
     int kq;
-    struct kevent event_list[SOMAXCONN];
+    struct kevent event_list[EVLIST_SIZE];
+    std::map<std::pair<int, int>, std::function<void(struct kevent)> > tmp_handlers;
+    std::map<holder, funct_t> handlers;
     std::vector<std::function<bool(struct kevent)> > predicates;
     std::vector<std::function<void(struct kevent)> > operations;
 };
-
 #endif /* event_queue_h */

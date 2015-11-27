@@ -9,19 +9,6 @@
 #include <string.h>
 #include <utility>
 
-struct request {
-    
-    request(char* query)
-    {
-        //I don't know how to save it in good way
-        //TODO: solve this bug
-        strcpy(text, query);
-    }
-    
-private:
-    char* host;
-    char* text;
-};
 
 //this method makes request ready for call
 //first result is string for doing request, second result is url to server, which we will connect
@@ -57,4 +44,4 @@ std::pair<char*, char*> parse_get_request(char* request) {
     return std::make_pair(result, site);
 }
 
-//TODO: Do we need to parse other requests like POST and so on?
+//TODO: Do we need to parse other requests like POST and so on? YES
