@@ -94,6 +94,13 @@ struct tcp_connection {
         server = new tcp_server(this, address, port);
     }
     
+    void close_server() {
+        if (server) {
+            delete server;
+            server = nullptr;
+        }
+    }
+    
     int get_client_fd() const {
         assert(client != nullptr);
         return client->get_fd();
@@ -112,17 +119,13 @@ struct tcp_connection {
     }
 private:
     
-//    enum {
-//        GETTING_HTTP_REQUEST, MAKING_REQUEST, ANSWERING
-//    } state;
-    
     struct tcp_client {
         ipv4_endpoint client;
         tcp_connection* connection;
         
         tcp_client(tcp_connection* tcp_connection, int fd) :
-        client(fd),
-        connection(tcp_connection)
+            client(fd),
+            connection(tcp_connection)
         {}
         
         int get_fd() const {
@@ -149,24 +152,116 @@ private:
             return server.get_fd();
         }
         
-        std::string get_msg(size_t len) {
-            len = std::min(len, message.length());
-            required -= len;
-            return message.substr(len);
-        }
-        
-        bool stop() {
-            return required == 0;
-        }
+//        std::string get_msg(size_t len) {
+//            len = std::min(len, message.length());
+//            required -= len;
+//            return message.substr(len);
+//        }
+//        
+//        bool stop() {
+//            return required == 0;
+//        }
         
         ~tcp_server()
         {}
         
-    private:
-        size_t required;
-        std::string message;
-        
     } *server;
+};
+
+struct tcp_wrap {
+    
+    tcp_wrap(tcp_connection* connection) :
+        connection(connection)
+    {}
+    
+    tcp_wrap(int fd) :
+        answer()
+    {
+        connection = new tcp_connection(fd);
+    }
+    
+    void init_server(in_addr addr) {
+        connection->init_server(addr);
+        size = 0;
+    }
+    
+    void close_server() {
+        connection->close_server();
+        size = 0;
+    }
+    
+    void set_host(std::string host) {
+        this->host = host;
+    }
+    
+    void set_request(std::string temp) {
+        request = temp;
+    }
+    
+    void append_request(std::string temp) {
+        request.append(temp);
+    }
+    
+    void set_answer(std::string temp) {
+        answer = temp;
+    }
+    
+    void append_answer(std::string temp, size_t added) {
+        answer.append(temp);
+        size += added;
+    }
+    
+    std::string get_host() {
+        return host;
+    }
+    
+    std::string& get_request() {
+        return request;
+    }
+    
+    std::string& get_answer() {
+        return answer;
+    }
+    
+    size_t get_size() {
+        return size;
+    }
+    
+    bool is_finish() {
+        return state == FINISH;
+    }
+    
+    void next_state() {
+        switch(state) {
+            case GETTING_REQUEST:
+                state = GETTING_RESPONSE;
+                break;
+            case GETTING_RESPONSE:
+                state = GETTING_ANSWER;
+                break;
+            case GETTING_ANSWER:
+                state = ANSWERING;
+                break;
+            case ANSWERING:
+                state = FINISH;
+                break;
+            default:
+                state = FINISH;
+        }
+    }
+
+    enum {
+        GETTING_REQUEST, GETTING_RESPONSE, GETTING_ANSWER, ANSWERING, FINISH
+    } state;
+    
+    ~tcp_wrap() {
+        delete connection;
+    }
+    
+    tcp_connection* connection;
+private:
+    std::string host, request, answer;
+    size_t size;
 };
 
 

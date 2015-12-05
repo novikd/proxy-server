@@ -27,25 +27,9 @@ typedef std::function<void(struct kevent&)> funct_t;
 struct events_queue;
 
 struct handler {
-    virtual void handle(struct kevent& event) {
-        
-    }
+    virtual void handle(struct kevent& event) = 0;
+    virtual ~handler() = default;
 };
-
-//struct tester : handler {
-//    void handle(struct kevent& event) {
-//        
-//    }
-//};
-
-//struct events_queue {
-//    events_queue();
-//    
-//    int add_event(struct kevent& event);
-//    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata);
-//    int occured();
-//    void execute();
-//};
 
 struct events_queue {
     
@@ -96,42 +80,16 @@ struct events_queue {
             perror("Getting number of events error!\n");
         }
         
-//        handler* h = static_cast<handler*>(event_list[0].udata);
-//        h->handle(event_list[0]);
         for (int i = 0; i < amount; ++i) {
             handler *event_handler = static_cast<handler*> (event_list[i].udata);
             event_handler->handle(event_list[i]);
         }
     }
     
-//    void run() {
-//        while (true) {
-//            int amount = kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
-//            
-//            if (amount == -1) {
-//                perror("Kqueue error! Can't to get amount of events\n");
-//            }
-//            for (int i = 0; i < amount; ++i) {
-//                auto it = handlers.find({event_list[i]});
-//                
-//                if (it == handlers.end()) {
-//                    perror("Can't find handler for event\n");
-//                    continue;
-//                }
-//                
-//                it->second(event_list[i]);
-//            }
-//        }
-//    }
-    
     //TODO: Save all functions and their identificators
     //Should I use std::function or pointers to functions.
 private:
     int kq;
     struct kevent event_list[EVLIST_SIZE];
-//    std::map<std::pair<int, int>, std::function<void(struct kevent)> > tmp_handlers;
-//    std::map<holder, funct_t> handlers;
-//    std::vector<std::function<bool(struct kevent)> > predicates;
-//    std::vector<std::function<void(struct kevent)> > operations;
 };
 #endif /* event_queue_h */

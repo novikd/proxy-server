@@ -11,6 +11,7 @@
 #include <netdb.h>
 
 #include <signal.h>
+#include <fcntl.h>
 
 #include "networking.hpp"
 #include "handlers.hpp"
@@ -35,7 +36,7 @@ int main() {
     signal(SIGTERM, exitor);
     
     main_socket = init_socket(PORT);
-
+    fcntl(main_socket, F_SETFL, O_NONBLOCK);
     main_thead = true;
     
     events_queue queue;

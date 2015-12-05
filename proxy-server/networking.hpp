@@ -17,7 +17,7 @@ struct proxy {
         queue(queue),
         main_socket(sock)
     {
-        queue.add_event(main_socket, EVFILT_READ, EV_ADD, 0, 0, new socket_listener(&queue));
+        queue.add_event(main_socket, EVFILT_READ, EV_ADD, 0, 0, new struct connector(&queue));
     }
     
     void run() {
@@ -35,22 +35,6 @@ struct proxy {
 private:
     events_queue queue;
     int main_socket;
-    
-    funct_t reader = [] (struct kevent& event) {
-        
-    };
-    
-    funct_t connector = [&] (struct kevent& event) {
-        sockaddr_in addr;
-        socklen_t len = sizeof(addr);
-        int fd = accept(main_socket, (sockaddr*) &addr, &len);
-        if (fd == -1) {
-            perror("Connection error!\n");
-        }
-        tcp_connection tmp(fd);
-        queue.add_event(fd, EVFILT_READ, EV_ADD, 0, 0, 0);
-    };
-    
 };
 
 //add to handlers pointer to events_queue
