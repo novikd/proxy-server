@@ -40,6 +40,7 @@ struct ipv4_endpoint {
         return fd;
     }
     
+    //TODO: Find situation, when destructor trys to close invalid socket.
     ~ipv4_endpoint() {
         close(fd); // read about errno. may be we
     }
