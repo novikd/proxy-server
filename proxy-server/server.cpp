@@ -30,13 +30,15 @@ void exitor(int param) {
 
 int init_socket(int);
 
-
 int main() {
 
     signal(SIGTERM, exitor);
     
     main_socket = init_socket(PORT);
-    fcntl(main_socket, F_SETFL, O_NONBLOCK);
+    int res = fcntl(main_socket, F_SETFL, O_NONBLOCK);
+    if (res == -1)
+        perror("Making socket non-blocking error occured!\n");
+    
     main_thead = true;
     
     events_queue queue;

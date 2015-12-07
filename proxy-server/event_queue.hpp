@@ -79,10 +79,21 @@ struct events_queue {
         if (amount == -1) {
             perror("Getting number of events error!\n");
         }
+
+        memset(valid, true, EVLIST_SIZE);
         
         for (int i = 0; i < amount; ++i) {
-            handler *event_handler = static_cast<handler*> (event_list[i].udata);
-            event_handler->handle(event_list[i]);
+            if (valid[i]) {
+                handler *event_handler = static_cast<handler*> (event_list[i].udata);
+                event_handler->handle(event_list[i]);
+            }
+        }
+    }
+    
+    void invalidate_events(uintptr_t id) {
+        for (size_t i = 0; i < EVLIST_SIZE; ++i) {
+            if (event_list[i].ident == id)
+                valid[i] = false;
         }
     }
     
@@ -91,5 +102,6 @@ struct events_queue {
 private:
     int kq;
     struct kevent event_list[EVLIST_SIZE];
+    bool valid[EVLIST_SIZE];
 };
 #endif /* event_queue_h */

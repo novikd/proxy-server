@@ -31,6 +31,8 @@ struct ipv4_endpoint {
         tmp.sin_addr.s_addr = inet_addr(inet_ntoa(address));
         tmp.sin_port = htons(80);
         
+        //Program sleeps here, but socket is non-blocking
+        //TODO: Solve this problem.
         if (connect(fd, (sockaddr*) &tmp, sizeof(tmp)) == -1) {
             perror("Connecting to server error");
         }
@@ -89,6 +91,7 @@ struct tcp_connection {
     
     tcp_connection(int fd) {
         client = new tcp_client(this, fd);
+        server = nullptr;
     }
     
     void init_server(in_addr address, int port = 80) {
@@ -108,8 +111,15 @@ struct tcp_connection {
     }
     
     int get_server_fd() const {
-        assert(server != nullptr);
-        return server->get_fd();
+//        assert(server != nullptr);
+        if (server != nullptr)
+            return server->get_fd();
+        else
+            return -1;
+    }
+    
+    bool is_server_inited() {
+        return server != nullptr;
     }
     
     ~tcp_connection() {
@@ -152,17 +162,7 @@ private:
         int get_fd() const {
             return server.get_fd();
         }
-        
-//        std::string get_msg(size_t len) {
-//            len = std::min(len, message.length());
-//            required -= len;
-//            return message.substr(len);
-//        }
-//        
-//        bool stop() {
-//            return required == 0;
-//        }
-        
+
         ~tcp_server()
         {}
         
@@ -173,24 +173,28 @@ struct tcp_wrap {
     
     tcp_wrap(tcp_connection* connection) :
         connection(connection)
-    {}
-    
-    tcp_wrap(int fd) :
-        answer()
     {
-        connection = new tcp_connection(fd);
+        state = GETTING_REQUEST;
     }
     
+    tcp_wrap(int fd)
+    {
+        connection = new tcp_connection(fd);
+        state = GETTING_REQUEST;
+    }
+    
+    /* Functions for server connection controling */
     void init_server(in_addr addr) {
+        if (connection->is_server_inited())
+            connection->close_server();
         connection->init_server(addr);
-        size = 0;
     }
     
     void close_server() {
         connection->close_server();
-        size = 0;
     }
     
+    /* Functions for setting string */
     void set_host(std::string host) {
         this->host = host;
     }
@@ -199,17 +203,16 @@ struct tcp_wrap {
         request = temp;
     }
     
-    void append_request(std::string temp) {
-        request.append(temp);
-    }
-    
     void set_answer(std::string temp) {
         answer = temp;
     }
     
-    void append_answer(std::string temp, size_t added) {
+    void append_request(std::string temp) {
+        request.append(temp);
+    }
+    
+    void append_answer(std::string temp) {
         answer.append(temp);
-        size += added;
     }
     
     std::string get_host() {
@@ -222,10 +225,6 @@ struct tcp_wrap {
     
     std::string& get_answer() {
         return answer;
-    }
-    
-    size_t get_size() {
-        return size;
     }
     
     bool is_finish() {
@@ -241,13 +240,13 @@ struct tcp_wrap {
                 state = GETTING_ANSWER;
                 break;
             case GETTING_ANSWER:
-                state = ANSWERING;
+                state = ANSWERING; //TODO: It should be answering
                 break;
             case ANSWERING:
                 state = FINISH;
                 break;
             default:
-                state = FINISH;
+                state = GETTING_REQUEST;
         }
     }
 
@@ -262,7 +261,6 @@ struct tcp_wrap {
     tcp_connection* connection;
 private:
     std::string host, request, answer;
-    size_t size;
 };
 
 
