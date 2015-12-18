@@ -59,24 +59,24 @@ struct ipv4_endpoint {
     uint16_t port;
 };
 
-int init_socket(int port) {
-    int sock = socket(PF_INET, SOCK_STREAM, 0);
-    
-    sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port);
-    
-    int binded = bind(sock, (sockaddr*) &addr, sizeof(addr));
-    
-    if (binded == -1) {
-        perror("Binding arror occured!\n");
-    }
-    
-    listen(sock, SOMAXCONN);
-    
-    return sock;
-}
+//int init_socket(int port) {
+//    int sock = socket(PF_INET, SOCK_STREAM, 0);
+//    
+//    sockaddr_in addr;
+//    addr.sin_family = AF_INET;
+//    addr.sin_addr.s_addr = INADDR_ANY;
+//    addr.sin_port = htons(port);
+//    
+//    int binded = bind(sock, (sockaddr*) &addr, sizeof(addr));
+//    
+//    if (binded == -1) {
+//        perror("Binding arror occured!\n");
+//    }
+//    
+//    listen(sock, SOMAXCONN);
+//    
+//    return sock;
+//}
 
 //This method will be run in another thread to make resolving non-blocking
 //TODO: implement it, make it non-blockingю May be I should make it an anonymous function?
