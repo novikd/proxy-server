@@ -25,6 +25,16 @@ struct request {
         return text;
     }
     
+    bool keep_alive() {
+        size_t i = text.find("Connection:");
+        i += 12;
+        if (text[i] == 'k') {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
     ~request() {}
     
 private:
@@ -32,15 +42,20 @@ private:
     std::string text;
     
     void parse_request() {
-        size_t i = text.find("Host: ");
+        size_t i = text.find("Host:");
         if (i == std::string::npos) {
-            perror("\nHOST NOT FOUND!\n");
+            std::cout << "\nBAD REQUEST FOUND\n";
+            return;
         }
         i += 6;
         size_t j = text.find("\r\n", i);
+        std::string host = text.substr(i, j - i);
         host = text.substr(i, j - i);
-        std::cout << "\nHost found: " << host << "\n";
+        i = text.find("Connection:");
+        i += 12;
+        std::cout << "Host for request: " << host << "\n";
     }
+    
 };
 
 int init_socket(int port) {

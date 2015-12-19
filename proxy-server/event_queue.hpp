@@ -85,28 +85,26 @@ struct events_queue {
         
         std::cout << "\nNEW EXECUTION!\n";
         for (int i = 0; i < amount; ++i) {
+            bool is_valid = true;
+            
             for (auto e : invalid)
-                if (e == event_list[i].ident)
-                    continue;
+                if (e == event_list[i].ident) {
+                    is_valid = false;
+                    break;
+                }
 
-            handler *event_handler = static_cast<handler*> (event_list[i].udata);
-            event_handler->handle(event_list[i]);
+            if (is_valid) {
+                handler *event_handler = static_cast<handler*> (event_list[i].udata);
+                event_handler->handle(event_list[i]);
+            }
         }
     }
     
     void invalidate_events(uintptr_t id) {
         invalid.push_back(id);
         std::cout << "APPENED: " << invalid.size() << "\n";
-//        for (size_t i = 0; i < EVLIST_SIZE; ++i) {
-//            if (event_list[i].ident == id) {
-//                std::cout << "\nEVENT DELETED\n";
-//                valid[i] = false;
-//            }
-//        }
     }
     
-    //TODO: Save all functions and their identificators
-    //Should I use std::function or pointers to functions.
 private:
     int kq;
     struct kevent event_list[EVLIST_SIZE];
@@ -114,4 +112,4 @@ private:
     std::vector<uintptr_t> invalid;
 };
 
-#endif /* event_queue_h */
+#endif /* event_queue_hpp */

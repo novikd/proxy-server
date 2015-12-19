@@ -234,15 +234,18 @@ struct tcp_wrap {
     void next_state() {
         switch(state) {
             case GETTING_REQUEST:
+                state = MAKING_REQUEST;
+                break;
+            case MAKING_REQUEST:
                 state = GETTING_RESPONSE;
                 break;
             case GETTING_RESPONSE:
-                state = GETTING_ANSWER;
+                state = ANSWERING; //
                 break;
             case GETTING_ANSWER:
-                state = ANSWERING; //TODO: It should be answering
+                state = ANSWERING; //TODO: DELETE THIS
                 break;
-            case ANSWERING:
+            case ANSWERING: 
                 state = FINISH;
                 break;
             default:
@@ -251,9 +254,13 @@ struct tcp_wrap {
     }
 
     enum {
-        GETTING_REQUEST, GETTING_RESPONSE, GETTING_ANSWER, ANSWERING, FINISH
+        GETTING_REQUEST, MAKING_REQUEST, GETTING_RESPONSE, GETTING_ANSWER, ANSWERING, FINISH
     } state;
     
+    enum {
+        KEEP_ALIVE, CLOSE, UNDERFINED
+    } keep;
+
     ~tcp_wrap() {
         delete connection;
     }

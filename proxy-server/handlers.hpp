@@ -27,86 +27,98 @@ struct client_handler : handler
 //        int fd = static_cast<int>(event.ident);
         switch(tcp->state) {
             case tcp_wrap::GETTING_REQUEST:
-                std::cout << "\nGETTING_REQUEST " << event.ident << "\n";
                 if (event.filter & EVFILT_READ) {
                     char* buffer = new char[event.data];
-                    recv(tcp->connection->get_client_fd(), buffer, event.data, 0);
-                    tcp->append_request(buffer);
+                    size_t size = recv(tcp->connection->get_client_fd(), buffer, event.data, 0);
+                    if (size == -1) {
+                        delete [] buffer;
+                        return;
+                    }
+                    std::cout << "\nGETTING_REQUEST: " << event.ident << "\n";
+                    tcp->append_request(std::string(buffer, size));
                     if (check_request_end()) {
                         std::cout << tcp->get_request();
-                        parse_host();
+                        parse_info();
                         tcp->next_state();
 
                         in_addr temp = resolve();
                         tcp->init_server(temp);
                         std::cout << "SERVER CONNECTED: " << tcp->connection->get_server_fd() << "\n";
-//                        queue->add_event(fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+
                         queue->add_event(tcp->connection->get_server_fd(), EVFILT_WRITE, EV_ADD, 0, 0, this);
                     }
                     delete[] buffer;
                 }
                 break;
-            case tcp_wrap::GETTING_RESPONSE:
+            case tcp_wrap::MAKING_REQUEST:
                 if (event.filter & EVFILT_WRITE) {
-                    std::cout << "\nGETTING_RESPONSE " << event.ident << "\n";
-                    send(tcp->connection->get_server_fd(), tcp->get_request().c_str(), tcp->get_request().size(), 0);
-                    tcp->set_request("");
-                    tcp->next_state();
-                    queue->add_event(tcp->connection->get_server_fd(), EVFILT_WRITE, EV_DELETE, 0, 0, this);
-                    queue->add_event(tcp->connection->get_server_fd(), EVFILT_READ, EV_ADD, 0, 0, this);
+                    std::cout << "\nMAKING REQUEST: " << event.ident << "\n";
+                    size_t size = send(tcp->connection->get_server_fd(), tcp->get_request().c_str(), tcp->get_request().size(), 0);
+                    if (size == -1) {
+                        perror("\nSENDING REQUEST TO SERVER ERROR OCCURRED\n");
+                    }
+                    if (size == tcp->get_request().length()) {
+                        tcp->set_request("");
+                        tcp->next_state();
+                        queue->add_event(tcp->connection->get_server_fd(), EVFILT_WRITE, EV_DELETE, 0, 0, this);
+                        queue->add_event(tcp->connection->get_server_fd(), EVFILT_READ, EV_ADD, 0, 0, this);
+//                        queue->add_event(tcp->connection->get_client_fd(), EVFILT_WRITE, EV_ADD, 0, 0, this);
+                    } else {
+                        tcp->set_request(tcp->get_request().substr(size));
+                    }
                 }
                 break;
-            case tcp_wrap::GETTING_ANSWER:
-//                assert(tcp->connection->get_server_fd() == event.ident);
-                std::cout << "\nENTERED " << event.ident << "\n";
+            case tcp_wrap::GETTING_RESPONSE:
+//                std::cout << "\nENTERED " << event.ident << "\n";
                 if (event.filter == EVFILT_READ) {
-                    std::cout << "\nGETTING_ANSWER " << event.ident << "\n";
+                    std::cout << "\nGETTING RESPONSE: " << event.ident << "\n";
                     char* buffer = new char[event.data];
                     bzero(buffer, event.data);
                     
                     if (event.ident != tcp->connection->get_server_fd()) {
+//                        std::cout << "\nINVALID FILEDESCRIPTOR: " << (event.ident == tcp->connection->get_client_fd()) << "\n";
+                        delete [] buffer;
                         perror("INVALID FileDescriptor ERROR");
+                        return;
                     }
                     
-//                    while (recv(tcp->connection->get_server_fd(), buffer, event.data, 0) > 0) {
-//                        tcp->append_answer(buffer);
-//                        bzero(buffer, event.data);
-//                    }
                     size_t size = recv(tcp->connection->get_server_fd(), buffer, event.data, 0);
                     if (size == -1) {
                         perror("\nREADING MESSAGE ERROR!\n");
                     }
-//                    send(tcp->connection->get_client_fd(), buffer, size, 0);
-                    tcp->append_answer(std::string(buffer, size)); // size deleted, I hope it will work
-//                    std::cout << buffer;
+
+                    tcp->append_answer(std::string(buffer, size));
+
                     delete[] buffer;
                     
                     if (check_answer_end()) {
-//                        std::cout << tcp->get_answer();
                         tcp->next_state();
                         queue->add_event(tcp->connection->get_server_fd(), EVFILT_READ, EV_DELETE, 0, 0, this);
                         queue->add_event(tcp->connection->get_client_fd(), EVFILT_WRITE, EV_ADD, 0, 0, this);
-//                        tcp->close_server();
-//                        delete [] buffer;
                     }
-                }
+                } /* else if (event.filter == EVFILT_WRITE) {
+                    std::cout << "\nSENDING ANSWER\n"
+                } */
                 break;
             case tcp_wrap::ANSWERING:
                 if (event.filter & EVFILT_WRITE) {
-                    std::cout << "\nANSWERING " << event.ident << "\n";
+                    std::cout << "\nANSWERING: " << event.ident << "\n";
                     send(tcp->connection->get_client_fd(), tcp->get_answer().c_str(), tcp->get_answer().size(), 0);
 //                    std::cout << tcp->get_answer();
                     tcp->set_answer("");
                     tcp->next_state();
-//                    queue->add_event(event.ident, event.filter, EV_DELETE, 0, 0, this);
+                    queue->add_event(event.ident, event.filter, EV_DELETE, 0, 0, this);
                     queue->add_event(tcp->connection->get_client_fd(), EVFILT_READ, EV_ADD, 0, 0, this);
                 }
                 break;
             default:
-//                tcp->next_state();
+//                if (tcp->keep == tcp_wrap::CLOSE)
+                tcp->close_server(); //TODO:
+                tcp->keep = tcp_wrap::UNDERFINED;
+                tcp->next_state();
 //                std::cout << "\nFINISH\n";
 //                queue->add_event(fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
-                disconnect(event);
+//                disconnect(event);
 //                delete this;
 //                break;
         }
@@ -137,7 +149,7 @@ private:
         }
     }
     
-    void parse_host() {
+    void parse_info() {
         std::string request(tcp->get_request());
         size_t i = request.find("Host:");
         if (i == std::string::npos) {
@@ -148,6 +160,13 @@ private:
         size_t j = request.find("\r\n", i);
         std::string host = request.substr(i, j - i);
         tcp->set_host(request.substr(i, j - i));
+        i = request.find("Connection:");
+        i += 12;
+        if (request[i] == 'k') {
+            tcp->keep = tcp_wrap::KEEP_ALIVE;
+        } else {
+            tcp->keep = tcp_wrap::CLOSE;
+        }
         std::cout << "Host for request: " << tcp->get_host() << "\n";
     }
     
@@ -173,7 +192,7 @@ private:
             content_length += request[j] - '0';
         }
         
-        return request.substr(i).length() >= content_length;
+        return request.substr(i).length() == content_length;
         
 //        if (request.find("\r\n\r\n", i) != std::string::npos)
 //            return true;
@@ -198,13 +217,13 @@ private:
             }
             i = answer.find("\r\n\r\n");
             i += 4;
-            if (answer.substr(i).length() > content_length) {
+//            if (answer.substr(i).length() > content_length) {
 //                std::cout << "\nTEXT OF REQUEST\n";
 //                std::cout << tcp->get_request();
-                std::cout << "\nNEED: " << content_length << " ITERATORS: " << answer.substr(i).length() << " " << "\n";
-//                std::cout << answer << "\n";
-                return true; // THIS IS BUG!!! (OR NOT?)
-            }
+//                std::cout << "\nNEED: " << content_length << " ITERATORS: " << answer.substr(i).length() << " " << "\n";
+////                std::cout << answer << "\n";
+//                return true; // THIS IS BUG!!! (OR NOT?)
+//            }
             return answer.substr(i).length() == content_length; // -1 ?
         } else {
             return answer.find("\r\n\r\n") != std::string::npos;
