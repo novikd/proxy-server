@@ -257,10 +257,6 @@ struct tcp_wrap {
         GETTING_REQUEST, MAKING_REQUEST, GETTING_RESPONSE, GETTING_ANSWER, ANSWERING, FINISH
     } state;
     
-    enum {
-        KEEP_ALIVE, CLOSE, UNDERFINED
-    } keep;
-
     ~tcp_wrap() {
         delete connection;
     }
@@ -270,5 +266,68 @@ private:
     std::string host, request, answer;
 };
 
+struct socket_exception : std::exception {
+    socket_exception(const std::string& str) :
+        error_info(str)
+    {}
+    
+    const char* what() const noexcept override {
+        return error_info.c_str();
+    }
+    
+    std::string error_info;
+};
+
+struct client_socket {
+    client_socket(int fd) {
+        sockaddr_in addr;
+        socklen_t len = sizeof(addr);
+        
+        client_fd = accept(fd, (sockaddr*) &addr, &len);
+        if (client_fd == -1) {
+            throw new socket_exception("Accepting connection error occurred!");
+        }
+    }
+    
+    
+    //May be change size_t to ptrdiff_t?
+    size_t write(std::string msg) {
+        size_t length = send(client_fd, msg.data(), msg.size(), 0);
+        
+        return length;
+    }
+    
+    std::string read(size_t buffer_size) {
+        std::vector<char> buffer(buffer_size);
+        size_t length = recv(client_fd, buffer.data(), buffer_size, 0);
+        
+        return std::string(buffer.cbegin(), buffer.cend() + length);
+    }
+    
+    int client_fd;
+};
+
+struct server_socket {
+    server_socket(in_addr addr) :
+        server_fd(socket(AF_INET, SOCK_STREAM, 0))
+    {
+        const int set = 1;
+        setsockopt(server_fd, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set));
+        
+        sockaddr_in tmp;
+        tmp.sin_family = AF_INET;
+        tmp.sin_addr.s_addr = inet_addr(inet_ntoa(addr));
+        tmp.sin_port = htons(80);
+        
+        //TODO: Solve this problem.
+        if (connect(server_fd, (sockaddr*) &tmp, sizeof(tmp)) == -1) {
+            throw new socket_exception("Connecting to server error occurred!");
+        }
+    }
+    
+    
+    
+    int server_fd;
+};
 
 #endif /* tcp_h */

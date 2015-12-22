@@ -51,7 +51,7 @@ struct client_handler : handler
                 }
                 break;
             case tcp_wrap::MAKING_REQUEST:
-                if (event.filter & EVFILT_WRITE) {
+                if (event.filter == EVFILT_WRITE) {
                     std::cout << "\nMAKING REQUEST: " << event.ident << "\n";
                     size_t size = send(tcp->connection->get_server_fd(), tcp->get_request().c_str(), tcp->get_request().size(), 0);
                     if (size == -1) {
@@ -62,7 +62,7 @@ struct client_handler : handler
                         tcp->next_state();
                         queue->add_event(tcp->connection->get_server_fd(), EVFILT_WRITE, EV_DELETE, 0, 0, this);
                         queue->add_event(tcp->connection->get_server_fd(), EVFILT_READ, EV_ADD, 0, 0, this);
-//                        queue->add_event(tcp->connection->get_client_fd(), EVFILT_WRITE, EV_ADD, 0, 0, this);
+                        queue->add_event(tcp->connection->get_client_fd(), EVFILT_WRITE, EV_ADD, 0, 0, this);
                     } else {
                         tcp->set_request(tcp->get_request().substr(size));
                     }
@@ -114,7 +114,6 @@ struct client_handler : handler
             default:
 //                if (tcp->keep == tcp_wrap::CLOSE)
                 tcp->close_server(); //TODO:
-                tcp->keep = tcp_wrap::UNDERFINED;
                 tcp->next_state();
 //                std::cout << "\nFINISH\n";
 //                queue->add_event(fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
@@ -162,11 +161,6 @@ private:
         tcp->set_host(request.substr(i, j - i));
         i = request.find("Connection:");
         i += 12;
-        if (request[i] == 'k') {
-            tcp->keep = tcp_wrap::KEEP_ALIVE;
-        } else {
-            tcp->keep = tcp_wrap::CLOSE;
-        }
         std::cout << "Host for request: " << tcp->get_host() << "\n";
     }
     
@@ -193,11 +187,6 @@ private:
         }
         
         return request.substr(i).length() == content_length;
-        
-//        if (request.find("\r\n\r\n", i) != std::string::npos)
-//            return true;
-//        
-//        return false;
     }
     
     bool check_answer_end() {
@@ -217,14 +206,7 @@ private:
             }
             i = answer.find("\r\n\r\n");
             i += 4;
-//            if (answer.substr(i).length() > content_length) {
-//                std::cout << "\nTEXT OF REQUEST\n";
-//                std::cout << tcp->get_request();
-//                std::cout << "\nNEED: " << content_length << " ITERATORS: " << answer.substr(i).length() << " " << "\n";
-////                std::cout << answer << "\n";
-//                return true; // THIS IS BUG!!! (OR NOT?)
-//            }
-            return answer.substr(i).length() == content_length; // -1 ?
+            return answer.substr(i).length() == content_length;
         } else {
             return answer.find("\r\n\r\n") != std::string::npos;
         }

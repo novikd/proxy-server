@@ -17,9 +17,8 @@
 #include "handlers.hpp"
 #include "http.h"
 
-#define PORT 2539
+const unsigned short PORT = 2539;
 
-events_queue queue;
 bool main_thead;
 int main_socket;
 
@@ -32,7 +31,7 @@ int init_socket(int);
 
 int main() {
 
-    signal(SIGTERM, exitor);
+    signal(SIGINT, exitor);
     
     main_socket = init_socket(PORT);
     int res = fcntl(main_socket, F_SETFL, O_NONBLOCK);
