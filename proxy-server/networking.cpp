@@ -18,8 +18,6 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-//TODO: To understand what to do with this two classes
-
 //in_addr helper
 struct ipv4_adress {
     
@@ -58,32 +56,3 @@ struct ipv4_endpoint {
     ipv4_adress adress;
     uint16_t port;
 };
-
-//int init_socket(int port) {
-//    int sock = socket(PF_INET, SOCK_STREAM, 0);
-//    
-//    sockaddr_in addr;
-//    addr.sin_family = AF_INET;
-//    addr.sin_addr.s_addr = INADDR_ANY;
-//    addr.sin_port = htons(port);
-//    
-//    int binded = bind(sock, (sockaddr*) &addr, sizeof(addr));
-//    
-//    if (binded == -1) {
-//        perror("Binding arror occured!\n");
-//    }
-//    
-//    listen(sock, SOMAXCONN);
-//    
-//    return sock;
-//}
-
-//This method will be run in another thread to make resolving non-blocking
-//TODO: implement it, make it non-blockingю May be I should make it an anonymous function?
-void resolve_dns(char* name) {
-    struct hostent* addr;
-    if ((addr = gethostbyname(name)) == nullptr) {
-        perror("Invalid link!\n");
-    }
-    char* link = addr->h_addr;
-}

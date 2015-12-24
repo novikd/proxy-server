@@ -11,7 +11,8 @@
 #include <netdb.h>
 
 #include <signal.h>
-#include <fcntl.h>
+#include <thread>
+#include <functional>
 
 #include "networking.hpp"
 #include "handlers.hpp"
@@ -23,7 +24,6 @@ bool main_thead;
 int main_socket;
 
 void exitor(int param) {
-    main_thead = false;
     close(main_socket);
 }
 
@@ -38,14 +38,15 @@ int main() {
     if (res == -1)
         perror("Making socket non-blocking error occured!\n");
     
-    main_thead = true;
+    proxy_server proxy(main_socket);
+    std::vector<std::thread> threads;
     
-    events_queue queue;
-    proxy proxy_server(main_socket, queue);
+    for (size_t i = 0; i < 4; ++i)
+        threads.push_back(std::thread(resolve_hosts, std::ref(proxy)));
     
     std::cerr << "Server started\n";
     
-    proxy_server.run();
+    proxy.run();
     
     return 0;
 }

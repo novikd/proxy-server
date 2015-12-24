@@ -11,6 +11,7 @@
 
 #include "event_queue.hpp"
 #include "tcp.hpp"
+#include "sockets.hpp"
 
 struct client_handler : handler
 {
@@ -221,10 +222,6 @@ private:
         }
         
         in_addr addr = *(in_addr*)(hostent->h_addr);
-        //        if (inet_aton(hostent->h_addr, &addr) == 0) {
-        //            std::cout << hostent->h_addr << "\n";
-        //            perror("Invalid IP address!\n");
-        //        }
         std::cout << "Trying to connect: " << inet_ntoa(addr) << "\n";
         return addr;
     }
@@ -233,23 +230,144 @@ private:
 
 struct connector : handler
 {
-    connector(events_queue* new_queue) :
+    connector(events_queue* new_queue, int sock) :
+        sock(sock),
         queue(new_queue)
     {}
     
     void handle(struct kevent& event) override {
         sockaddr_in addr;
         socklen_t size = sizeof(addr);
-        int fd = accept(static_cast<int>(event.ident), (sockaddr*) &addr, &size);
+        int fd = accept(sock, (sockaddr*) &addr, &size);
         if (fd == -1) {
             perror("Connection error: Can't connect to new user!\n");
         }
         std::cout << "CLIENT CONNECTED: " << fd << "\n";
         queue->add_event(fd, EVFILT_READ, EV_ADD, 0, 0, new client_handler(queue, new tcp_wrap(fd)));
     }
+    int sock;
+private:
+    events_queue* queue;
+};
+
+bool check_request_end(const std::string& request) {
+    size_t i;
+
+    if ((i = request.find("\r\n\r\n")) == std::string::npos) {
+        return false;
+    }
+    
+    if (request.find("POST") == std::string::npos)
+        return true;
+    
+    return true;
+    
+    i += 4;
+    size_t j = request.find("Content-Length:");
+    j += 16;
+    
+    size_t content_length = 0;
+    for (; j < request.size() && request[j] != '\r'; ++j) {
+        content_length *= 10;
+        content_length += request[j] - '0';
+    }
+    
+    return request.substr(i).length() == content_length;
+}
+
+
+struct new_client_handler : handler
+{
+    new_client_handler(events_queue* queue, int fd) :
+        queue(queue),
+        client(fd)
+    {}
+    
+    void handle(struct kevent& event) {
+        if (event.flags & EV_EOF && event.data == 0) {
+            if (client.has_server()) {
+                queue->invalidate_events(client.get_server_fd());
+            }
+            queue->invalidate_events(client.get_fd());
+            delete this;
+            return;
+        }
+        if (event.filter == EVFILT_READ) {
+            client.read(200);
+            if (check_request_end(client.buffer)) {
+#warning connect to server and add new events
+                client.send_msg();
+            }
+        } else {
+            client.write();
+        }
+    }
+private:
+    events_queue* queue;
+    client_wrap client;
+};
+
+struct server_handler : handler
+{
+    server_handler(events_queue* queue, in_addr address) :
+        queue(queue),
+        server(address)
+    {}
+    
+    server_handler(events_queue* queue, int socket) :
+        queue(queue),
+        server(socket)
+    {}
+    
+    server_wrap* get_server() {
+        return &server;
+    }
+    
+    void handle(struct kevent& event) {
+        if (event.flags & EV_EOF && event.data == 0) {
+            queue->invalidate_events(server.get_fd());
+            delete this;
+            return;
+        }
+        if (event.filter == EVFILT_WRITE) {
+            server.write();
+            if (server.buffer_empty()) {
+                queue->add_event(event.ident, EVFILT_READ, EV_ADD, 0, 0, this);
+                queue->add_event(event.ident, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
+            }
+        } else {
+            if (server.client->has_free_capacity()) {
+                server.read(200);
+                server.send_msg();
+            }
+        }
+    }
     
 private:
     events_queue* queue;
+    server_wrap server;
+};
+
+struct signal_handler : handler {
+    
+    signal_handler(events_queue* queue, connector* con) :
+        queue(queue),
+        con_handler(con)
+    {}
+    
+    void handle(struct kevent& event) {
+        switch(event.ident) {
+            case SIGINT:
+                queue->add_event(con_handler->sock, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+                delete con_handler;
+                break;
+            default:
+                std::terminate();
+        }
+    }
+    
+    events_queue* queue;
+    connector* con_handler;
 };
 
 #endif /* handlers_h */

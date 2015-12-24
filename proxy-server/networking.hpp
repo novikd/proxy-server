@@ -9,21 +9,25 @@
 #ifndef networking_hpp
 #define networking_hpp
 
-#include <queue>
-
+#include "lru_cache.hpp"
 #include "handlers.hpp"
+#include <fcntl.h>
 
-struct proxy {
+struct proxy_server {
     
-    proxy(int sock, events_queue& queue) :
-        queue(queue),
+    proxy_server(int sock) :
+        queue(),
+        work(true),
         main_socket(sock)
     {
-        queue.add_event(main_socket, EVFILT_READ, EV_ADD, 0, 0, new struct connector(&queue));
+        struct connector* tmp = new struct connector(&queue, main_socket);
+        queue.add_event(main_socket, EVFILT_READ, EV_ADD, tmp);
+        queue.add_event(SIGINT, EVFILT_SIGNAL, EV_ADD, new signal_handler(&queue, tmp));
+        queue.add_event(SIGTERM, EVFILT_SIGNAL, EV_ADD, new signal_handler(&queue, tmp));
     }
-    
+
     void run() {
-        while(true) {
+        while(work) {
             int amount = queue.occured();
             
             if (amount == -1) {
@@ -33,69 +37,93 @@ struct proxy {
         }
     }
     
+    void start() {
+        work = true;
+    }
+
+    void hard_stop() {
+        work = false;
+    }
+
+    void stop() {
+#warning FIXME: memory leak here
+        queue.add_event(main_socket, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+    }
     
-private:
+    lru_cache<std::string, addrinfo> hosts;
     events_queue queue;
+    std::mutex blocker;
+    std::queue<client_wrap*> clients_for_resolver;
+    std::condition_variable cv;
+private:
+    bool work;
     int main_socket;
 };
 
-void resolver(events_queue& queue, std::mutex& global_mutex, std::queue<std::string>& host_queue, std::condition_variable cv) {
-    std::unique_lock<std::mutex> locker(global_mutex);
-    cv.wait(locker, [&]() {
-        return host_queue.size() > 0;
-    });
-    
-    std::string host_name = host_queue.front();
-    host_queue.pop();
-    
-    size_t i = host_name.find(':');
-    std::string name, port;
-    if (i == std::string::npos) {
-        name = host_name;
-    } else {
-        name = host_name.substr(0, i);
-        port = host_name.substr(i);
-    }
-    
-    addrinfo hints, *result;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    
-    int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &result);
-    
-    if (error) {
-        perror("\nRESOLVING ERROR OCCURED!\n");
-    }
-    
-    int sock = -1;
-    for (addrinfo* tmp = result; tmp; tmp = result->ai_next) {
-        sock = socket(tmp->ai_family, tmp->ai_socktype, tmp->ai_protocol);
+void resolve_hosts(proxy_server& proxy) {
+    while (true) {
+        std::unique_lock<std::mutex> locker(proxy.blocker);
+        proxy.cv.wait(locker, [&]() {
+            return proxy.clients_for_resolver.size() > 0;
+        });
         
-        if (connect(sock, tmp->ai_addr, tmp->ai_addrlen) == -1) {
-            perror("\nCAN NOT CONNECT TO THE SERVER!\n");
-            close(sock);
-            sock = - 1;
-            continue;
+        addrinfo hints, *result;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = PF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        
+        client_wrap* client = proxy.clients_for_resolver.front();
+        proxy.clients_for_resolver.pop();
+        
+        if (proxy.hosts.exists(client->host)) {
+            result = new addrinfo(proxy.hosts[client->host]);
+        } else {
+            size_t i = client->host.find(":");
+            std::string name(client->host.substr(0, i)), port;
+            
+            if (i != std::string::npos)
+                port = client->host.substr(i);
+            
+            int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &result);
+
+            if (error) {
+                perror("\nRESOLVING ERROR OCCURRED\n");
+            } else {
+                proxy.hosts.insert(client->host, *result);
+            }
         }
-        break;
+        
+        int sock = -1;
+        sock = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+        if (sock == -1) {
+            perror("\nGETTING SOCKET ERROR OCCURRED\n");
+        }
+        
+        if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
+            perror("\nMAKING SOCKET NON-BLOCKING ERROR OCCURRED\n");
+        }
+        
+        if (connect(sock, result->ai_addr, result->ai_addrlen) == -1) {
+            perror("\nCONNECTING ERROR OCCURRED\n");
+            close(sock);
+            sock = -1;
+        }
+        
+        try {
+            server_handler* tmp = new server_handler(&proxy.queue, sock);
+            client->bind(tmp->get_server());
+            tmp->get_server()->bind(client);
+            proxy.queue.add_event(sock, EVFILT_WRITE, EV_ADD, 0, 0, tmp);
+        } catch (...) {
+            perror("\nCREATING SERVER ERROR OCCURRED\n");
+        }
+        
+        freeaddrinfo(result);
     }
-    
-    if (sock == -1) {
-        perror("\nINVALID HOST FOUND!\n");
-    }
-    freeaddrinfo(result);
-    
-    //TODO: return result
 }
 
-//add to handlers pointer to events_queue +
-//create new big parant for handlres, which destroys handler and deleting information +-
-//create socket class to create new file descriptor in constructor and close it in destructor +
-//create events_queue in main() and then send it to proxy constructor +
-//delet this works
-//handler all the errors
+#warning handler all the errors
 
-//sigterm should stop main_loop and destructors will do everything
+#warning sigterm should stop main_loop and destructors will do everything
 
-#endif /* networking_h */
+#endif /* networking_hpp */
