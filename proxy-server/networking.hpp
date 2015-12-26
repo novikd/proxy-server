@@ -20,9 +20,9 @@ struct proxy_server {
         work(true),
         main_socket(sock)
     {
-        struct connector* tmp = new struct connector(&queue, main_socket);
+        struct connector* tmp = new connector(&queue, main_socket);
         queue.add_event(main_socket, EVFILT_READ, EV_ADD, tmp);
-        queue.add_event(SIGINT, EVFILT_SIGNAL, EV_ADD, new signal_handler(&queue, tmp));
+        queue.add_event(SIGINT, EVFILT_SIGNAL, EV_ADD, new signal_handler(&queue, tmp)); // TODO: when signal handlers dies
         queue.add_event(SIGTERM, EVFILT_SIGNAL, EV_ADD, new signal_handler(&queue, tmp));
     }
 
@@ -64,7 +64,7 @@ void resolve_hosts(proxy_server& proxy) {
     while (true) {
         std::unique_lock<std::mutex> locker(proxy.blocker);
         proxy.cv.wait(locker, [&]() {
-            return proxy.clients_for_resolver.size() > 0;
+            return !proxy.clients_for_resolver.empty();
         });
         
         addrinfo hints, *result;
@@ -111,7 +111,7 @@ void resolve_hosts(proxy_server& proxy) {
         
         try {
             server_handler* tmp = new server_handler(&proxy.queue, sock);
-            client->bind(tmp->get_server());
+            client->bind(tmp->get_server()); // TODO: race condition
             tmp->get_server()->bind(client);
             proxy.queue.add_event(sock, EVFILT_WRITE, EV_ADD, 0, 0, tmp);
         } catch (...) {

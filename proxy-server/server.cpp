@@ -44,9 +44,12 @@ int main() {
     for (size_t i = 0; i < 4; ++i)
         threads.push_back(std::thread(resolve_hosts, std::ref(proxy)));
     
+    // TODO: in case of exception we should notify threads that they must quit and join them
+
     std::cerr << "Server started\n";
     
     proxy.run();
+
     
     return 0;
 }

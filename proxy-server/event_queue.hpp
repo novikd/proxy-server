@@ -22,15 +22,14 @@
 
 const uint16_t EVLIST_SIZE = 512;
 
-struct events_queue;
-
 struct handler {
     virtual void handle(struct kevent& event) = 0;
     virtual ~handler() = default;
 };
 
 struct events_queue {
-    
+
+    // TODO: make non copyable
     events_queue() :
         kq(kqueue())
     {}
@@ -91,7 +90,6 @@ struct events_queue {
 private:
     int kq;
     struct kevent event_list[EVLIST_SIZE];
-    bool valid[EVLIST_SIZE];
     std::vector<uintptr_t> invalid;
 };
 
