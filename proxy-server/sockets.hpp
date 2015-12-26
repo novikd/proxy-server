@@ -22,20 +22,22 @@ struct socket_exception : std::exception {
 };
 
 struct client_socket {
+    // TODO: disable copy
     client_socket(int fd) {
         sockaddr_in addr;
         socklen_t len = sizeof(addr);
         
         client_fd = accept(fd, (sockaddr*) &addr, &len);
         if (client_fd == -1) {
-            throw new socket_exception("Accepting connection error occurred!");
+            throw socket_exception("Accepting connection error occurred!");
         }
     }
     
     
     //May be change size_t to ptrdiff_t?
-    size_t write(std::string msg) {
+    size_t write(std::string const& msg) {
         size_t length = send(client_fd, msg.data(), msg.size(), 0);
+        // TODO: check for error
         
         return length;
     }
@@ -43,23 +45,27 @@ struct client_socket {
     std::string read(size_t buffer_size) {
         std::vector<char> buffer(buffer_size);
         size_t length = recv(client_fd, buffer.data(), buffer_size, 0);
-        
-        return std::string(buffer.cbegin(), buffer.cend() + length);
+        // TODO: check for error
+
+        return std::string(buffer.cbegin(), buffer.cbegin() + length);
     }
     
     ~client_socket() {
         close(client_fd);
     }
-    
+
+private:
     int client_fd;
 };
 
+// TODO: merge with client_socket
+//       constructors can be replaced with static functions
 struct server_socket {
     server_socket(in_addr addr) :
-        server_fd(socket(AF_INET, SOCK_STREAM, 0))
+        server_fd(socket(AF_INET, SOCK_STREAM, 0)) // TODO: check for errors
     {
         const int set = 1;
-        setsockopt(server_fd, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set));
+        setsockopt(server_fd, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)); // TODO: check for errors
         
         sockaddr_in tmp;
         tmp.sin_family = AF_INET;
@@ -68,7 +74,7 @@ struct server_socket {
         
 #warning TODO: Make this socket non-blocking
         if (connect(server_fd, (sockaddr*) &tmp, sizeof(tmp)) == -1) {
-            throw new socket_exception("Connecting to server error occurred!");
+            throw socket_exception("Connecting to server error occurred!");
         }
     }
     
@@ -81,7 +87,7 @@ struct server_socket {
         size_t length = send(server_fd, msg.data(), msg.size(), 0);
         
         if (length == -1) {
-            throw new socket_exception("Sending to the server error occurred!");
+            throw socket_exception("Sending to the server error occurred!");
         }
         
         return length;
@@ -103,6 +109,7 @@ struct server_socket {
 
 struct server_wrap;
 
+// TODO: remove and move function bodies to .cpp
 struct socket_holder {
     virtual bool has_free_capacity() = 0;
     virtual void append_buffer(std::string msg) = 0;
@@ -173,19 +180,17 @@ struct client_wrap : socket_holder {
     }
     
     void unbind() {
-        this->server = nullptr;
+        this->server = nullptr; // TODO
     }
     
     ~client_wrap() {
-        if (server)
-            delete server;
-        server = nullptr;
+        delete server;
     }
     
     std::string buffer, host;
     client_socket client;
 
-    socket_holder* server;
+    socket_holder* server; // TODO: replace with unique_ptr
 };
 
 struct server_wrap : socket_holder {
