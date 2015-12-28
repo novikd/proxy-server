@@ -10,7 +10,6 @@
 #define networking_hpp
 
 #include "lru_cache.hpp"
-//#include "handlers.hpp"
 #include "event_queue.hpp"
 #include "sockets.hpp"
 
@@ -20,6 +19,7 @@
 
 #include <mutex>
 #include <fcntl.h>
+#include <iostream>
 
 struct proxy_server {
     
@@ -36,7 +36,7 @@ struct proxy_server {
     lru_cache<std::string, addrinfo> hosts;
     events_queue queue;
     std::mutex blocker;
-//    std::queue<client_wrap*> clients_for_resolver;
+    std::queue<std::pair<uintptr_t, std::string> > hosts_to_resolve;
     std::condition_variable cv;
 private:
     static int init_socket(int);
@@ -63,6 +63,6 @@ private:
 
 //TODO: handle all the errors
 
-#warning sigterm should stop main_loop and destructors will do everything
+//TODO: sigterm should stop main_loop and destructors will do everything
 
 #endif /* networking_hpp */

@@ -6,8 +6,24 @@
 //  Copyright © 2015 Дмитрий Новик. All rights reserved.
 //
 
-#ifndef socket_exception_h
-#define socket_exception_h
+#ifndef socket_exception_hpp
+#define socket_exception_hpp
 
+struct socket_exception : std::exception {
+    socket_exception(const std::string& str) :
+    error_info(str)
+    {}
+    
+    socket_exception(std::string&& msg) :
+    error_info(std::move(msg))
+    {}
+    
+    const char* what() const noexcept override {
+        return error_info.c_str();
+    }
+    
+private:
+    std::string error_info;
+};
 
-#endif /* socket_exception_h */
+#endif /* socket_exception_hpp */

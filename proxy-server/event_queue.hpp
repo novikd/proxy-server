@@ -12,85 +12,46 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/event.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
 #include <vector>
 #include <functional>
-#include <netinet/in.h> // sockaddr_in
+#include <map>
 
-//#include "tcp.hpp"
-
-const uint16_t EVLIST_SIZE = 512;
-
-struct handler {
-    virtual void handle(struct kevent& event) = 0;
-    virtual ~handler() = default;
+struct id {
+    
+    id();
+    id(uintptr_t new_ident, int16_t new_filter);
+    id(struct kevent const& event);
+    
+    friend bool operator==(id const&, id const&);
+    friend bool operator<(id const&, id const&);
+private:
+    uintptr_t ident;
+    int16_t filter;
 };
 
 struct events_queue {
-
-    // TODO: make non copyable
-    events_queue() :
-        kq(kqueue())
-    {}
+    static const uint16_t EVLIST_SIZE = 512;
+    events_queue(events_queue const&) = delete;
+    events_queue& operator=(events_queue const&) = delete;
     
-    int add_event(const struct kevent& kev) {
-        return kevent(kq, &kev, 1, nullptr, 0, nullptr);
-    }
+    events_queue();
     
-    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata) {
-        struct kevent kev;
-        EV_SET(&kev, ident, filter, flags, fflags, data, udata);
-        return kevent(kq, &kev, 1, nullptr, 0, nullptr);
-    }
-
-    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, void* udata) {
-        return add_event(ident, filter, flags, 0, 0, udata);
-    }
+    int add_event(const struct kevent& kev);
+    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata);
+    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, std::function<void(struct kevent&)> handler);
+    int delete_event(uintptr_t ident, int16_t filter);
     
-    int occured() {
-        return kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
-    }
+    int occured();
+    void execute();
+    void invalidate_events(uintptr_t id);
     
-    void execute() {
-        int amount = kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
-        
-        if (amount == -1) {
-            perror("Getting number of events error!\n");
-        }
-
-        invalid.clear();
-        
-        std::cout << "\nNEW EXECUTION!\n";
-        for (int i = 0; i < amount; ++i) {
-            bool is_valid = true;
-            
-            for (auto e : invalid)
-                if (e == event_list[i].ident) {
-                    is_valid = false;
-                    break;
-                }
-
-            if (is_valid) {
-                handler *event_handler = static_cast<handler*> (event_list[i].udata);
-                event_handler->handle(event_list[i]);
-            }
-        }
-    }
-    
-    void invalidate_events(uintptr_t id) {
-        invalid.push_back(id);
-        std::cout << "APPENED: " << invalid.size() << "\n";
-    }
-    
-    ~events_queue() {
-        close(kq);
-    }
+    ~events_queue();
     
 private:
     int kq;
     struct kevent event_list[EVLIST_SIZE];
     std::vector<uintptr_t> invalid;
+    std::map<id, std::function<void(struct kevent&)> > handlers;
 };
 
 #endif /* event_queue_hpp */
