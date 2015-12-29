@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include "socket_exception.hpp"
+#include <netinet/in.h>
 
 const uint32_t BUFFER_SIZE = 20000;
 
