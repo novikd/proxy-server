@@ -12,16 +12,16 @@
 
 struct http_request {
     
-    http_request(std::string const& str);
+    http_request(std::string& str);
     
     std::string get_host() const noexcept;
-    
     std::string get_header() const noexcept;
     
     ~http_request();
     
 private:
-    std::string host, header;
+    std::string& header;
+    std::string host;
     
     void parse_request();
     void parse_first_line();

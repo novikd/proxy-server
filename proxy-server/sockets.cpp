@@ -116,6 +116,10 @@ std::string& client::get_buffer() {
     return buffer;
 }
 
+size_t client::get_buffer_size() const noexcept {
+    return buffer.length();
+}
+
 void client::append(std::string& str) {
     buffer.append(str);
 }

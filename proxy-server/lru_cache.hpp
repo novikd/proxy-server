@@ -12,28 +12,31 @@
 #include <map>
 #include <queue>
 
-template<typename key, typename value>
+//FIXME: It works in the wrong way
+//       enqueue for existing element can break everything
+
+template<typename key_t, typename value_t>
 struct lru_cache {
     lru_cache(size_t cache_size = 20000) :
         capacity(cache_size)
     {}
     
-    void insert(const key& key_val, const value& val) {
+    void insert(const key_t& key, const value_t& value) {
         if (q.size() == capacity) {
-            key tmp = q.front();
+            key_t tmp = q.front();
             q.pop();
             data.erase(tmp);
         }
-        data[key_val] = val;
-        q.push(key_val);
+        data[key] = value;
+        q.push(key);
     }
     
-    bool exists(const key& key_val) {
-        return data.find(key_val) != data.end();
+    bool exists(const key_t& key) {
+        return data.find(key) != data.end();
     }
     
-    value operator[](const key& key_val) {
-        return data[key_val];
+    value_t operator[](const key_t& key) {
+        return data[key];
     }
     
     size_t size() const noexcept {
@@ -42,8 +45,8 @@ struct lru_cache {
     
 private:
     size_t capacity;
-    std::queue<key> q;
-    std::map<key, value> data;
+    std::queue<key_t> q;
+    std::map<key_t, value_t> data;
 };
 
 

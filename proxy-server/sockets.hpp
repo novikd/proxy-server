@@ -52,6 +52,7 @@ struct client {
     void unbind();
     
     std::string& get_buffer();
+    size_t get_buffer_size() const noexcept;
     void append(std::string&);
     bool has_capcacity() const noexcept;
     

@@ -128,9 +128,10 @@ void proxy_server::read_from_client(struct kevent& event) {
     client->read(event.data);
     queue.delete_event(event.ident, EVFILT_WRITE);
     if (client->check_request_end()) {
+//        std::cout << client->get_buffer();
         http_request request(client->get_buffer());
-        std::cout << request.get_header();
-//        hosts_to_resolve.push(make_pair(event.ident, request.get_host()));
+        std::cout << client->get_buffer();
+
         if (!client->has_server()) {
             addrinfo hints, *result;
             memset(&hints, 0, sizeof(hints));
@@ -215,7 +216,8 @@ void proxy_server::write_to_client(struct kevent& event) {
     client->write();
     if (client->has_server())
         client->get_msg();
-    queue.add_event(event.ident, event.filter, EV_DISABLE, 0, 0, nullptr);
+    if (client->get_buffer_size() == 0)
+        queue.add_event(event.ident, event.filter, EV_DISABLE, 0, 0, nullptr);
 }
 
 void proxy_server::write_to_server(struct kevent& event) {

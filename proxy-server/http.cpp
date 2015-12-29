@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include "http.hpp"
 
-http_request::http_request(const std::string& str) :
+http_request::http_request(std::string& str) :
     header(str)
 {
     parse_request();
