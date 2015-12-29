@@ -11,6 +11,8 @@
 
 #include "networking.hpp"
 #include "http.hpp"
+#include <signal.h>
+#include <netinet/in.h>
 
 //TODO: rewrite constructor. 
 proxy_server::proxy_server(int port) :
