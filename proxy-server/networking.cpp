@@ -13,16 +13,16 @@
 #include "http.hpp"
 #include <signal.h>
 
-//TODO: rewrite constructor. 
 proxy_server::proxy_server(int port) :
+    main_socket(init_socket(port)),
     queue(),
-    work(true),
-    main_socket(init_socket(port))
+    work(true)
 {
     queue.add_event(main_socket, EVFILT_READ, EV_ADD, [this](struct kevent& kev) {
         this->connect_client(kev);
     });
     queue.add_event(SIGINT, EVFILT_SIGNAL, EV_ADD, [this](struct kevent& event) {
+        std::cout << "SIGINT CAUGHT!";
         this->hard_stop();
     });
 }
@@ -99,7 +99,6 @@ void proxy_server::disconnect_client(struct kevent& event) {
     delete client;
 }
 
-//TODO: UNBIND
 void proxy_server::disconnect_server(struct kevent& event) {
     std::cout << "Disconnect server: " << event.ident << "\n";
     struct server* server = servers[event.ident];
@@ -160,21 +159,23 @@ void proxy_server::read_from_client(struct kevent& event) {
                 perror("\nGETTING SOCKET ERROR OCCURRED\n");
             }
             
-    //        const int set = 1;
-    //        if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) {
-    //            perror("\nSETTING SOCKET ERROR OCCURRED!\n");
-    //        };
-            //TODO: To understand why does not it work.
-//            if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
-//                perror("\nMAKING SOCKET NON-BLOCKING ERROR OCCURRED\n");
-//            }
+            const int set = 1;
+            if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) {
+                perror("\nSETTING SOCKET ERROR OCCURRED!\n");
+            };
+
+            if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
+                perror("\nMAKING SOCKET NON-BLOCKING ERROR OCCURRED\n");
+            }
             
             std::cout << "Connecting to server: " << inet_ntoa(((sockaddr_in*) (result->ai_addr))->sin_addr) << "\n";
             sockaddr addr = *(result->ai_addr);
             if (connect(sock, &addr, sizeof(addr)) == -1) {
-                perror("\nCONNECTING ERROR OCCURRED\n");
-                close(sock);
-                sock = -1;
+                if (errno != EINPROGRESS) {
+                    perror("\nCONNECTING ERROR OCCURRED\n");
+                    close(sock);
+                    sock = -1;
+                }
             }
             
             try {
@@ -194,11 +195,11 @@ void proxy_server::read_from_client(struct kevent& event) {
 }
 
 void proxy_server::read_from_server(struct kevent& event) {
-    std::cout << "Reading from server: " << event.ident << "!\n";
     if (event.flags & EV_EOF && event.data == 0) {
         disconnect_server(event);
         return;
     }
+    std::cout << "Reading from server: " << event.ident << "!\n";
     struct server* server = servers[event.ident];
     size_t size = server->read(event.data);
     if (size > 0) {
@@ -226,6 +227,16 @@ void proxy_server::write_to_server(struct kevent& event) {
         disconnect_server(event);
         return;
     }
+    
+    int err;
+    socklen_t len = sizeof(err);
+
+    if (getsockopt(static_cast<int>(event.ident), SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0) {
+        disconnect_server(event);
+        perror("Connecting to server failed!");
+        return;
+    }
+    
     struct server* server = servers[event.ident];
 // TODO: may be server should have capacity?
     server->write();
@@ -239,37 +250,60 @@ void proxy_server::write_to_server(struct kevent& event) {
         });
     }
 }
-/*
-void resolve_hosts(proxy_server& proxy) {
-    while (true) {
-        std::unique_lock<std::mutex> locker(proxy.blocker);
-        proxy.cv.wait(locker, [&]() {
-            return !proxy.clients_for_resolver.empty();
+
+void proxy_server::on_host_resolved(struct kevent& event) {
+    if (event.flags & EV_EOF && event.data == 0) {
+        disconnect_client(event);
+        return;
+    }
+    //TODO: check, that client is valid
+    struct client* client = clients[event.ident];
+    try {
+        struct server* server = new struct server(static_cast<int>(event.data));
+        client->bind(server);
+        server->bind(client);
+        servers[server->get_fd()] = server;
+        client->send_msg();
+        queue.add_event(server->get_fd(), EVFILT_WRITE, EV_ADD, [this](struct kevent& kev) {
+            this->write_to_server(kev);
         });
+    } catch (...) {
+        perror("\nCREATING NEW SERVER ERROR OCCURRED!\n");
+    }
+
+}
+
+void proxy_server::resolve_hosts() {
+    while (work) {
+        std::unique_lock<std::mutex> locker(blocker);
+        cv.wait(locker, [&]() {
+            return !hosts_to_resolve.empty();
+        });
+        
+        std::pair<uintptr_t, std::string> request = hosts_to_resolve.front();
+        hosts_to_resolve.pop();
         
         addrinfo hints, *result;
         memset(&hints, 0, sizeof(hints));
-        hints.ai_family = PF_UNSPEC;
+        hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_NUMERICSERV;
         
-        client_wrap* client = proxy.clients_for_resolver.front();
-        proxy.clients_for_resolver.pop();
-        
-        if (proxy.hosts.exists(client->host)) {
-            result = new addrinfo(proxy.hosts[client->host]);
+        if (hosts.exists(request.second)) {
+            result = new addrinfo(hosts[request.second]);
         } else {
-            size_t i = client->host.find(":");
-            std::string name(client->host.substr(0, i)), port;
+            size_t i = request.second.find(":");
+            std::string name(request.second.substr(0, i)), port = "80";
             
             if (i != std::string::npos)
-                port = client->host.substr(i);
+                port = request.second.substr(i);
             
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &result);
             
             if (error) {
                 perror("\nRESOLVING ERROR OCCURRED\n");
             } else {
-                proxy.hosts.insert(client->host, *result);
+                hosts.insert(request.second, *result);
             }
         }
         
@@ -279,26 +313,30 @@ void resolve_hosts(proxy_server& proxy) {
             perror("\nGETTING SOCKET ERROR OCCURRED\n");
         }
         
+        const int set = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) {
+            perror("\nSETTING SOCKET ERROR OCCURRED!\n");
+        };
+        
         if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
             perror("\nMAKING SOCKET NON-BLOCKING ERROR OCCURRED\n");
         }
         
-        if (connect(sock, result->ai_addr, result->ai_addrlen) == -1) {
-            perror("\nCONNECTING ERROR OCCURRED\n");
-            close(sock);
-            sock = -1;
+        std::cout << "Connecting to server: " << inet_ntoa(((sockaddr_in*) (result->ai_addr))->sin_addr) << "\n";
+        sockaddr addr = *(result->ai_addr);
+        if (connect(sock, &addr, sizeof(addr)) == -1) {
+            if (errno != EINPROGRESS) {
+                perror("\nCONNECTING ERROR OCCURRED\n");
+                close(sock);
+                sock = -1;
+            }
         }
+//TODO: return the result
         
-        try {
-            server_handler* tmp = new server_handler(&proxy.queue, sock);
-            client->bind(tmp->get_server()); // TODO: race condition
-            tmp->get_server()->bind(client);
-            proxy.queue.add_event(sock, EVFILT_WRITE, EV_ADD, 0, 0, tmp);
-        } catch (...) {
-            perror("\nCREATING SERVER ERROR OCCURRED\n");
-        }
+        queue.add_event(request.first, EVFILT_USER, EV_ADD | EV_CLEAR, sock, [this](struct kevent& kev) {
+            this->on_host_resolved(kev);
+        });
         
         freeaddrinfo(result);
     }
 }
-*/

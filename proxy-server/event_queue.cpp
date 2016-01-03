@@ -25,9 +25,13 @@ int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, uin
     return kevent(kq, &kev, 1, nullptr, 0, nullptr);
 }
 
-int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, std::function<void(struct kevent&)> f) {
-    handlers[id{ident, filter}] = f;
-    return add_event(ident, filter, flags, 0, 0, nullptr);
+int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, std::function<void(struct kevent&)> handler) {
+    return add_event(ident, filter, flags, 0, handler);
+}
+
+int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, intptr_t data, std::function<void(struct kevent&)> handler) {
+    handlers[id{ident, filter}] = handler;
+    return add_event(ident, filter, flags, 0, data, nullptr);
 }
 
 int events_queue::delete_event(uintptr_t ident, int16_t filter) {

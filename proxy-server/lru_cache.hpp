@@ -10,7 +10,7 @@
 #define lru_cache_hpp
 
 #include <map>
-#include <queue>
+#include <list>
 
 //FIXME: It works in the wrong way
 //       enqueue for existing element can break everything
@@ -22,13 +22,22 @@ struct lru_cache {
     {}
     
     void insert(const key_t& key, const value_t& value) {
-        if (q.size() == capacity) {
-            key_t tmp = q.front();
-            q.pop();
-            data.erase(tmp);
+        if (list.size() == capacity) {
+            if (exists(key)) {
+                for (auto it = list.begin(); it != list.end(); ++it) {
+                    if (*it == key) {
+                        list.erase(it);
+                        break;
+                    }
+                }
+            } else {
+                key_t tmp = list.front();
+                list.pop_front();
+                data.erase(tmp);
+            }
         }
         data[key] = value;
-        q.push(key);
+        list.push_back(key);
     }
     
     bool exists(const key_t& key) {
@@ -40,12 +49,12 @@ struct lru_cache {
     }
     
     size_t size() const noexcept {
-        return size;
+        return list.size();
     }
     
 private:
     size_t capacity;
-    std::queue<key_t> q;
+    std::list<key_t> list;
     std::map<key_t, value_t> data;
 };
 

@@ -19,6 +19,7 @@
 
 #include <mutex>
 #include <fcntl.h>
+#include <queue>
 #include <iostream>
 
 struct proxy_server {
@@ -31,13 +32,10 @@ struct proxy_server {
     void hard_stop();
     void stop();
     
+    void resolve_hosts();
+    
     ~proxy_server();
     
-    lru_cache<std::string, addrinfo> hosts;
-    events_queue queue;
-    std::mutex blocker;
-    std::queue<std::pair<uintptr_t, std::string> > hosts_to_resolve;
-    std::condition_variable cv;
 private:
     static int init_socket(int);
     
@@ -52,17 +50,21 @@ private:
     void timeout_exceeded(struct kevent&);
 
     void connect_client(struct kevent&);
+    void on_host_resolved(struct kevent&);
 
+/*********** FIELDS ***********/
     std::map<uintptr_t, client*> clients;
     std::map<uintptr_t, server*> servers;
-    bool work;
     int main_socket;
-    
+    events_queue queue;
+    lru_cache<std::string, addrinfo> hosts;
+    std::mutex blocker;
+    std::queue<std::pair<uintptr_t, std::string> > hosts_to_resolve;
+    std::condition_variable cv;
+    bool work;
 };
 
-
 //TODO: handle all the errors
-
 //TODO: sigterm should stop main_loop and destructors will do everything
 
 #endif /* networking_hpp */
