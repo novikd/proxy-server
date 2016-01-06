@@ -10,7 +10,8 @@
 #include "http.hpp"
 
 http_request::http_request(std::string& str) :
-    header(str)
+    header(str),
+    canceled(false)
 {
     parse_request();
     parse_first_line();
@@ -20,14 +21,16 @@ http_request::http_request(http_request const& rhs) :
     header(rhs.header),
     host(rhs.host),
     client_id(rhs.client_id),
-    server_addr(rhs.server_addr)
+    server_addr(rhs.server_addr),
+    canceled(false)
 {}
 
 http_request::http_request(http_request&& rhs) :
     header(rhs.header),
     host(std::move(rhs.host)),
     client_id(rhs.client_id),
-    server_addr(rhs.server_addr)
+    server_addr(rhs.server_addr),
+    canceled(false)
 {}
 
 std::string http_request::get_host() const noexcept {
@@ -52,6 +55,14 @@ void http_request::set_server(sockaddr addr) noexcept {
 
 sockaddr http_request::get_server() const noexcept {
     return server_addr;
+}
+
+void http_request::cancel() noexcept {
+    canceled = true;
+}
+
+bool http_request::is_canceled() const noexcept {
+    return canceled;
 }
 
 http_request::~http_request() {}

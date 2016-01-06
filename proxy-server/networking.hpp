@@ -65,7 +65,8 @@ private:
     lru_cache<std::string, sockaddr> hosts;
     std::mutex blocker;
     std::condition_variable cv;
-    std::queue<http_request> pending, answers;
+    std::queue<http_request*> pending, answers;
+    std::map<client*, http_request*> requests;
 };
 
 //TODO: handle all the errors

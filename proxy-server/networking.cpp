@@ -122,6 +122,12 @@ void proxy_server::disconnect_client(struct kevent& event) {
     std::cout << "Disconnect client: " << event.ident << "\n";
     struct client* client = clients[event.ident];
     
+    auto it = requests.find(client);
+    if (it != requests.end()) {
+        it->second->cancel();
+        requests.erase(client);
+    }
+    
     if (client->has_server())
         queue.invalidate_events(client->get_server_fd());
     
@@ -176,12 +182,16 @@ void proxy_server::read_from_client(struct kevent& event) {
     //???: Is this line necessary now?
     queue.delete_event(event.ident, EVFILT_WRITE);
     if (client->check_request_end()) {
-        http_request request(client->get_buffer());
-        request.set_client(client->get_fd());
+        http_request* request = new http_request(client->get_buffer());
+        request->set_client(client->get_fd());
+        requests[client] = request;
         
         std::cout << client->get_buffer();
-        //TODO: lock mutex
+
+        std::unique_lock<std::mutex> locker(blocker);
         pending.push(request);
+        locker.unlock();
+
         cv.notify_one();
     }
 }
@@ -255,15 +265,19 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     }
     
     std::unique_lock<std::mutex> locker(blocker);
-    http_request request{std::move(answers.front())};
+    http_request* request{std::move(answers.front())};
     answers.pop();
     locker.unlock();
-    std::cout <<"Client: " << request.get_client() << "\n";
+    std::cout <<"Client: " << request->get_client() << "\n";
+    
+    if (request->is_canceled())
+        return;
     
     //TODO: check that client is valid and handle cancelation
-    struct client* client = clients.at(request.get_client());
+    struct client* client = clients.at(request->get_client());
+    requests.erase(client);
     if (!client->has_server()) {
-        sockaddr result = std::move(request.get_server());
+        sockaddr result = std::move(request->get_server());
         int server_socket = -1;
         server_socket = socket(AF_INET, SOCK_STREAM, 0);
         if (server_socket == -1) {
@@ -279,7 +293,7 @@ void proxy_server::on_host_resolved(struct kevent& event) {
             perror("\nMAKING SOCKET NON-BLOCKING ERROR OCCURRED\n");
         }
         
-        std::cout << "Connecting to server: " << request.get_host() << "\nIP: "<< inet_ntoa(((sockaddr_in*) &result)->sin_addr) << "\nSocket: " << server_socket << "\n";
+        std::cout << "Connecting to server: " << request->get_host() << "\nIP: "<< inet_ntoa(((sockaddr_in*) &result)->sin_addr) << "\nSocket: " << server_socket << "\n";
         if (connect(server_socket, &result, sizeof(result)) == -1) {
             if (errno != EINPROGRESS) {
                 //TODO: stop proxy-server here
@@ -321,8 +335,8 @@ void proxy_server::resolve_hosts() {
         
         sockaddr result;
         
-        if (hosts.exists(request.get_host())) {
-            result = hosts[request.get_host()];
+        if (hosts.exists(request->get_host())) {
+            result = hosts[request->get_host()];
             locker.unlock();
         } else {
             locker.unlock();
@@ -332,11 +346,11 @@ void proxy_server::resolve_hosts() {
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_flags = AI_NUMERICSERV;
 
-            size_t i = request.get_host().find(":");
-            std::string name(request.get_host().substr(0, i)), port = "80";
+            size_t i = request->get_host().find(":");
+            std::string name(request->get_host().substr(0, i)), port = "80";
             
             if (i != std::string::npos)
-                port = request.get_host().substr(i + 1);
+                port = request->get_host().substr(i + 1);
             
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             
@@ -347,11 +361,11 @@ void proxy_server::resolve_hosts() {
                 result = *res->ai_addr;
                 freeaddrinfo(res);
                 locker.lock();
-                hosts.insert(request.get_host(), result);
+                hosts.insert(request->get_host(), result);
                 locker.unlock();
             }
         }
-        request.set_server(result);
+        request->set_server(result);
         
         std::cout << "RESOLVED!\n";
         locker.lock();
@@ -360,7 +374,7 @@ void proxy_server::resolve_hosts() {
         
         char msg = 1;
         if (write(pipe_fds[1], &msg, sizeof(msg)) == -1) {
-            //TODO: handle errors
+            hard_stop();
         }
     }
 }

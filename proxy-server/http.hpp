@@ -25,6 +25,9 @@ struct http_request {
     void set_server(sockaddr) noexcept;
     sockaddr get_server() const noexcept;
     
+    void cancel() noexcept;
+    bool is_canceled() const noexcept;
+    
     ~http_request();
     
 private:
@@ -32,6 +35,7 @@ private:
     std::string host;
     int client_id;
     sockaddr server_addr;
+    bool canceled;
     
     void parse_request();
     void parse_first_line();
