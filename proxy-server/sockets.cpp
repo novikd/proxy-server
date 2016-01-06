@@ -171,10 +171,16 @@ bool client::check_request_end() const noexcept {
     if (buffer.find("POST") == std::string::npos)
         return true;
     
-    i += 4;
-    i = buffer.find("\r\n\r\n", i);
+    size_t j = buffer.find("Content-Length: ");
+    j += 16;
+    size_t content_length = 0;
+    while (buffer[j] != '\r') {
+        content_length *= 10;
+        content_length += (buffer[j++] - '0');
+    }
     
-    return i == std::string::npos;
+    i += 4;
+    return buffer.substr(i).length() == content_length;
 }
 
 client::~client() {

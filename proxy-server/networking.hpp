@@ -12,6 +12,7 @@
 #include "lru_cache.hpp"
 #include "event_queue.hpp"
 #include "sockets.hpp"
+#include "http.hpp"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -53,15 +54,18 @@ private:
     void on_host_resolved(struct kevent&);
 
 /*********** FIELDS ***********/
+    //TODO: make pointers unique_ptr
     std::map<uintptr_t, client*> clients;
     std::map<uintptr_t, server*> servers;
-    int main_socket;
+    int main_socket, pipe_fds[2];
+    
     events_queue queue;
-    lru_cache<std::string, addrinfo> hosts;
-    std::mutex blocker;
-    std::queue<std::pair<uintptr_t, std::string> > hosts_to_resolve;
-    std::condition_variable cv;
     bool work;
+    
+    lru_cache<std::string, sockaddr> hosts;
+    std::mutex blocker;
+    std::condition_variable cv;
+    std::queue<http_request> pending, answers;
 };
 
 //TODO: handle all the errors

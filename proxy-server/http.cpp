@@ -16,12 +16,42 @@ http_request::http_request(std::string& str) :
     parse_first_line();
 }
 
+http_request::http_request(http_request const& rhs) :
+    header(rhs.header),
+    host(rhs.host),
+    client_id(rhs.client_id),
+    server_addr(rhs.server_addr)
+{}
+
+http_request::http_request(http_request&& rhs) :
+    header(rhs.header),
+    host(std::move(rhs.host)),
+    client_id(rhs.client_id),
+    server_addr(rhs.server_addr)
+{}
+
 std::string http_request::get_host() const noexcept {
     return host;
 }
 
 std::string http_request::get_header() const noexcept {
     return header;
+}
+
+void http_request::set_client(int id) noexcept {
+    client_id = id;
+}
+
+int http_request::get_client() const noexcept {
+    return client_id;
+}
+
+void http_request::set_server(sockaddr addr) noexcept {
+    server_addr = addr;
+}
+
+sockaddr http_request::get_server() const noexcept {
+    return server_addr;
 }
 
 http_request::~http_request() {}
