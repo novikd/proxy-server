@@ -104,6 +104,8 @@ proxy_server::~proxy_server() {
     */
     close(pipe_fd);
     close(main_socket);
+    
+    std::cout << "Server stoped!\n";
 }
 
 int proxy_server::init_socket(int port) {
@@ -198,8 +200,6 @@ void proxy_server::read_from_client(struct kevent& event) {
     struct client* client = clients.at(event.ident);
     client->read(event.data);
     
-    //???: Is this line necessary now?
-//    queue.delete_event(event.ident, EVFILT_WRITE);
     if (http_request::check_request_end(client->get_buffer())) {
         http_request* request = new http_request(client->get_buffer());
         request->set_client(client->get_fd());
@@ -292,7 +292,7 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     requests.erase(client);
     
     if (request->is_error()) {
-        client->get_buffer() = "HTTP/1.1 404 Not Found\r\nContent-type: text/html\r\nContent-length: 124\r\nConnection: close\r\n\r\n<html><head><title>Not Found</title></head><body>\r\nSorry, the object you requested was not found.\r\n</body><html>\r\n\r\n";
+        client->get_buffer() = "HTTP/1.1 400 Bad Request\r\nServer: proxy\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: 164\r\nConnection: close\r\n\r\n<html>\r\n<head><title>400 Bad Request</title></head>\r\n<body bgcolor=\"white\">\r\n<center><h1>400 Bad Request</h1></center>\r\n<hr><center>proxy</center>\r\n</body>\r\n</html>";
         queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev) {
             this->write_to_client(kev);
         });
