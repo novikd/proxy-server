@@ -9,6 +9,9 @@
 #ifndef socket_exception_hpp
 #define socket_exception_hpp
 
+#include <exception>
+#include <iostream>
+//TODO: rename this class and reuse it in all parts of programm
 struct socket_exception : std::exception {
     socket_exception(const std::string& str) :
     error_info(str)

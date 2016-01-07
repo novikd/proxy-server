@@ -60,8 +60,7 @@ void events_queue::execute() {
     }
     
     invalid.clear();
-    
-    std::cout << "\nNEW EXECUTION!\n";
+
     for (int i = 0; i < amount; ++i) {
         bool is_valid = true;
         
@@ -72,7 +71,7 @@ void events_queue::execute() {
             }
         
         if (is_valid) {
-            std::function<void(struct kevent&)> handler = handlers[id{event_list[i]}];
+            std::function<void(struct kevent&)> handler = handlers.at(id{event_list[i]});
             handler(event_list[i]);
         }
     }
@@ -80,7 +79,6 @@ void events_queue::execute() {
 
 void events_queue::invalidate_events(uintptr_t id) {
     invalid.push_back(id);
-    std::cout << "APPENED: " << invalid.size() << "\n";
 }
 
 events_queue::~events_queue() {
@@ -89,25 +87,25 @@ events_queue::~events_queue() {
 
 /********** ID **********/
 
-id::id() :
+events_queue::id::id() :
     ident(0),
     filter(0)
 {}
 
-id::id(uintptr_t new_ident, int16_t new_filter) :
+events_queue::id::id(uintptr_t new_ident, int16_t new_filter) :
     ident(new_ident),
     filter(new_filter)
 {}
 
-id::id(struct kevent const& event) :
+events_queue::id::id(struct kevent const& event) :
     ident(event.ident),
     filter(event.filter)
 {}
 
-bool operator==(id const& frs, id const& snd) {
+bool operator==(events_queue::id const& frs, events_queue::id const& snd) {
     return frs.ident == snd.ident && frs.filter == snd.filter;
 }
 
-bool operator<(id const& frs, id const& snd) {
+bool operator<(events_queue::id const& frs, events_queue::id const& snd) {
     return frs.ident < snd.ident || (frs.ident == snd.ident && frs.filter < snd.filter);
 }

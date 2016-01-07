@@ -10,23 +10,26 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <cassert>
+#include <fcntl.h>
 
 #include "host_resolver.hpp"
 
-host_resolver::host_resolver(int fd, bool& flag) :
-    pipe_fd(socket(PF_LOCAL, SOCK_STREAM, 0)),
+host_resolver::host_resolver(bool& flag) :
     work(flag)
 {
-    int fds[2] = {fd, pipe_fd};
-    if (pipe(fds) == -1) {
-        perror("CREATING A PIPE ERROR OCCURRED!\n");
-    }
-    
     for (int i = 0; i < 4; ++i) {
-        threads[i] = std::thread([this]() {
+        threads.push_back(std::thread([this]() {
             this->resolve();
-        });
+        }));
     }
+}
+
+void host_resolver::set_fd(int fd) noexcept {
+    pipe_fd = fd;
+}
+
+int host_resolver::get_fd() const noexcept {
+    return pipe_fd;
 }
 
 void host_resolver::push(http_request* request) {
@@ -41,22 +44,31 @@ http_request* host_resolver::pop() {
     return request;
 }
 
+std::mutex& host_resolver::get_mutex() noexcept {
+    return blocker;
+}
+
 void host_resolver::notify() {
     cv.notify_one();
 }
 
-void host_resolver::stop() noexcept {
+void host_resolver::stop() {
+    std::unique_lock<std::mutex> locker{blocker};
     work = false;
 }
 
 host_resolver::~host_resolver() {
     close(pipe_fd);
+    cv.notify_all();
+    for (int i = 0; i < 4; ++i)
+        if (threads[i].joinable())
+            threads[i].join();
 }
 
-void host_resolver::write_to_pipe() const {
+void host_resolver::write_to_pipe() noexcept {
     char tmp = 1;
     if (write(pipe_fd, &tmp, sizeof(tmp)) == -1) {
-        //TODO: handle the error
+        stop();
     }
 }
 
@@ -64,8 +76,12 @@ void host_resolver::resolve() {
     while (work) {
         std::unique_lock<std::mutex> locker(blocker);
         cv.wait(locker, [&]() {
-            return !pending.empty();
+            return !pending.empty() || !work;
         });
+        
+        if (!work)
+            break;
+        
         std::cout << "START TO RESOLVE: " << std::this_thread::get_id() << "\n";
         auto request = pending.front();
         pending.pop();
@@ -92,8 +108,10 @@ void host_resolver::resolve() {
             int error = getaddrinfo(name.c_str(), port.c_str(), &hints, &res);
             
             if (error) {
-                perror("\nRESOLVING ERROR OCCURRED\n");
-                assert(false);
+                perror("\nResolving error occurred!\n");
+                locker.lock();
+                request->set_error();
+                locker.unlock();
             } else {
                 result = *res->ai_addr;
                 freeaddrinfo(res);

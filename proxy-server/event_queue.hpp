@@ -16,21 +16,7 @@
 #include <functional>
 #include <map>
 
-struct id {
-    
-    id();
-    id(uintptr_t new_ident, int16_t new_filter);
-    id(struct kevent const& event);
-    
-    friend bool operator==(id const&, id const&);
-    friend bool operator<(id const&, id const&);
-private:
-    uintptr_t ident;
-    int16_t filter;
-};
-
 struct events_queue {
-    static const uint16_t EVLIST_SIZE = 512;
     events_queue(events_queue const&) = delete;
     events_queue& operator=(events_queue const&) = delete;
     
@@ -41,6 +27,7 @@ struct events_queue {
     int add_event(uintptr_t ident, int16_t filter, uint16_t flags, std::function<void(struct kevent&)> handler);
     int add_event(uintptr_t ident, int16_t filter, uint16_t flags, intptr_t data, std::function<void(struct kevent&)> handler);
     int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, std::function<void(struct kevent&)> handler);
+
     int delete_event(uintptr_t ident, int16_t filter);
     
     int occured();
@@ -50,6 +37,23 @@ struct events_queue {
     ~events_queue();
     
 private:
+    
+    struct id {
+        id();
+        id(uintptr_t new_ident, int16_t new_filter);
+        id(struct kevent const& event);
+        
+        friend bool operator==(id const&, id const&);
+        friend bool operator<(id const&, id const&);
+    private:
+        uintptr_t ident;
+        int16_t filter;
+    };
+    friend bool operator==(id const&, id const&);
+    friend bool operator<(id const&, id const&);
+
+    
+    static const uint16_t EVLIST_SIZE = 512;
     int kq;
     struct kevent event_list[EVLIST_SIZE];
     std::vector<uintptr_t> invalid;

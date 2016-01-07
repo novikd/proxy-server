@@ -16,6 +16,8 @@
 #include <exception>
 #include <vector>
 #include <cassert>
+
+#include "socket_exception.hpp"
 #include "sockets.hpp"
 
 /******** SOCKET ********/
@@ -42,16 +44,6 @@ socket_wrap socket_wrap::connect(int accept_fd) {
     }
     
     return temp;
-}
-
-void socket_wrap::accept_socket(int accept_fd) {
-    sockaddr_in addr;
-    socklen_t len = sizeof(addr);
-    
-    fd = accept(accept_fd, (sockaddr*) &addr, &len);
-    if (fd == -1) {
-        throw socket_exception("Accepting connection error occurred!");
-    }
 }
 
 ptrdiff_t socket_wrap::write(std::string const& msg) {
@@ -161,26 +153,6 @@ void client::send_msg() {
     assert(server);
     server->append(buffer);
     buffer.clear();
-}
-
-bool client::check_request_end() const noexcept {
-    size_t i = buffer.find("\r\n\r\n");
-    
-    if (i == std::string::npos)
-        return false;
-    if (buffer.find("POST") == std::string::npos)
-        return true;
-    
-    size_t j = buffer.find("Content-Length: ");
-    j += 16;
-    size_t content_length = 0;
-    while (buffer[j] != '\r') {
-        content_length *= 10;
-        content_length += (buffer[j++] - '0');
-    }
-    
-    i += 4;
-    return buffer.substr(i).length() == content_length;
 }
 
 client::~client() {

@@ -11,7 +11,8 @@
 
 http_request::http_request(std::string& str) :
     header(str),
-    canceled(false)
+    canceled(false),
+    error(false)
 {
     parse_request();
     parse_first_line();
@@ -22,7 +23,8 @@ http_request::http_request(http_request const& rhs) :
     host(rhs.host),
     client_id(rhs.client_id),
     server_addr(rhs.server_addr),
-    canceled(false)
+    canceled(false),
+    error(false)
 {}
 
 http_request::http_request(http_request&& rhs) :
@@ -30,7 +32,8 @@ http_request::http_request(http_request&& rhs) :
     host(std::move(rhs.host)),
     client_id(rhs.client_id),
     server_addr(rhs.server_addr),
-    canceled(false)
+    canceled(false),
+    error(false)
 {}
 
 std::string http_request::get_host() const noexcept {
@@ -39,6 +42,26 @@ std::string http_request::get_host() const noexcept {
 
 std::string http_request::get_header() const noexcept {
     return header;
+}
+
+bool http_request::check_request_end(std::string const& msg) {
+    size_t i = msg.find("\r\n\r\n");
+    
+    if (i == std::string::npos)
+        return false;
+    if (msg.find("POST") == std::string::npos)
+        return true;
+    
+    size_t j = msg.find("Content-Length: ");
+    j += 16;
+    size_t content_length = 0;
+    while (msg[j] != '\r') {
+        content_length *= 10;
+        content_length += (msg[j++] - '0');
+    }
+    
+    i += 4;
+    return msg.substr(i).length() == content_length;
 }
 
 void http_request::set_client(int id) noexcept {
@@ -61,8 +84,16 @@ void http_request::cancel() noexcept {
     canceled = true;
 }
 
+void http_request::set_error() noexcept {
+    error = true;
+}
+
 bool http_request::is_canceled() const noexcept {
     return canceled;
+}
+
+bool http_request::is_error() const noexcept {
+    return error;
 }
 
 http_request::~http_request() {}

@@ -18,19 +18,24 @@
 #include "lru_cache.hpp"
 
 struct host_resolver {
+    host_resolver(const host_resolver&) = delete;
     
-    host_resolver(int, bool&);
+    host_resolver(bool&);
+    
+    void set_fd(int) noexcept;
+    int get_fd() const noexcept;
     
     void push(http_request*);
     http_request* pop();
-    void notify();
     
-    void stop() noexcept;
+    std::mutex& get_mutex() noexcept;
+    void notify();
+    void stop();
     
     ~host_resolver();
     
 private:
-    void write_to_pipe() const;
+    void write_to_pipe() noexcept;
     void resolve();
 
 /*********** FIELDS ***********/

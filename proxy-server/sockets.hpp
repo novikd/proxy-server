@@ -10,7 +10,6 @@
 #define sockets_hpp
 
 #include <iostream>
-#include "socket_exception.hpp"
 #include <netinet/in.h>
 
 const uint32_t BUFFER_SIZE = 20000;
@@ -25,7 +24,6 @@ struct socket_wrap {
     socket_wrap(int fd);
 
     static socket_wrap connect(int);
-    void accept_socket(int accept_fd); //TODO: delete this method. connect should do it
     
     ptrdiff_t write(std::string const& msg);
     std::string read(size_t buffer_size);
@@ -63,8 +61,6 @@ struct client {
     void get_msg();
     void send_msg();
     
-    bool check_request_end() const noexcept;
-
     ~client();
 private:
     std::string buffer;
