@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(proxy-server)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -pthread")
 
 set(SOURCE_FILES
 "proxy-server/networking.cpp"
@@ -14,6 +14,8 @@ set(SOURCE_FILES
 "proxy-server/event_queue.hpp"
 "proxy-server/server.cpp"
 "proxy-server/lru_cache.hpp"
-"proxy-server/socket_exception.hpp")
+"proxy-server/socket_exception.hpp"
+"proxy-server/host_resolver.hpp"
+"proxy-server/host_resolver.cpp")
 
 add_executable(proxy ${SOURCE_FILES})
