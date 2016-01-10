@@ -41,11 +41,10 @@ private:
     void disconnect_server(struct kevent&);
     
     void read_from_client(struct kevent&);
+    void read_header_from_server(struct kevent&);
     void read_from_server(struct kevent&);
     void write_to_client(struct kevent&);
     void write_to_server(struct kevent&);
-    
-    void timeout_exceeded(struct kevent&);
 
     void connect_client(struct kevent&);
     void on_host_resolved(struct kevent&);
@@ -60,7 +59,10 @@ private:
     bool work;
     
     host_resolver resolver;
-    std::map<client*, http_request*> requests;
+    std::map<int, http_request*> requests;
+    std::map<int, http_response> responses;
+    
+    lru_cache<std::string, http_response> cache;
 };
 
 //TODO: handle all the errors

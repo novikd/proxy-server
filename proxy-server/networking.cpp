@@ -53,6 +53,7 @@ proxy_server::proxy_server(int port) :
     });
     
     /* Event for signals handling */
+    signal(SIGINT, SIG_IGN);
     queue.add_event(SIGINT, EVFILT_SIGNAL, EV_ADD, [this](struct kevent& event) {
         std::cout << "SIGINT CAUGHT!\n";
         this->hard_stop();
@@ -140,13 +141,20 @@ void proxy_server::disconnect_client(struct kevent& event) {
     std::cout << "Disconnect client: " << event.ident << "\n";
     struct client* client = clients[event.ident];
     
-    std::unique_lock<std::mutex> locker{resolver.get_mutex()};
-    auto it = requests.find(client);
-    if (it != requests.end()) {
-        it->second->cancel();
-        requests.erase(client);
+    {
+        std::unique_lock<std::mutex> locker{resolver.get_mutex()};
+        auto it = requests.find(client->get_fd());
+        if (it != requests.end()) {
+            it->second->cancel();
+            requests.erase(client->get_fd());
+        }
     }
-    locker.unlock();
+
+    {
+        auto it = responses.find(client->get_fd());
+        if (it != responses.end())
+            responses.erase(it);
+    }
     
     if (client->has_server()) {
         int server_fd = client->get_server_fd();
@@ -169,6 +177,18 @@ void proxy_server::disconnect_client(struct kevent& event) {
 void proxy_server::disconnect_server(struct kevent& event) {
     std::cout << "Disconnect server: " << event.ident << "\n";
     struct server* server = servers[event.ident];
+    
+    {
+        auto it = responses.find(server->get_client_fd());
+        if (it != responses.end()) {
+            if (it->second.is_cachable() && !it->second.checking()) {
+                std::cout << "Added to cache 1!\n";
+                cache.insert(it->second.get_request(), it->second);
+                std::cout << it->second.get_request() << it->second.get_text();
+            }
+            responses.erase(it);
+        }
+    }
     
     queue.invalidate_events(event.ident);
     servers.erase(event.ident);
@@ -201,14 +221,88 @@ void proxy_server::read_from_client(struct kevent& event) {
     client->read(event.data);
     
     if (http_request::check_request_end(client->get_buffer())) {
+//        auto it = responses.find(client->get_fd());
+//        if (it != responses.end() && it->second.is_cachable() && !it->second.checking()) {
+//            std::cout << "Added to cache 2!\n";
+//            cache.insert(it->second.get_request(), it->second);
+//            std::cout << it->second.get_request();
+//            it->second.clear_text();
+//        }
+
+        responses[client->get_fd()] = http_response(http_request::is_already_cached(client->get_buffer()));
+        
         http_request* request = new http_request(client->get_buffer());
+        responses[client->get_fd()].set_request(request->get_header());
+        
+        if (cache.exists(request->get_header())) {
+            std::cout << "Trying to use cache!\n";
+            request->add_etag(cache[request->get_header()].get_etag());
+            responses[client->get_fd()].checking() = true;
+        }
+        
+        if (client->has_server()) {
+            if (client->get_host() == request->get_host()) {
+                client->send_msg();
+                queue.add_event(client->get_server_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev) {
+                    this->write_to_server(kev);
+                });
+                delete request;
+                return;
+            } else {
+                client->disconnect_server();
+            }
+        }
         request->set_client(client->get_fd());
-        requests[client] = request;
+        requests[client->get_fd()] = request;
         
         std::cout << client->get_buffer();
 
         resolver.push(request);
         resolver.notify();
+    }
+}
+
+void proxy_server::read_header_from_server(struct kevent& event) {
+    if (event.flags & EV_EOF && event.data == 0) {
+        disconnect_server(event);
+        return;
+    }
+    
+    std::cout << "Reading header from server: " << event.ident << "\n";
+    struct server* server = servers.at(event.ident);
+    http_response* response = &responses.at(server->get_client_fd());
+    std::string msg = std::move(server->read(event.data));
+    response->force_append_text(msg);
+    if (response->check_header_end()) {
+        std::cout << response->get_text() << "\n";
+        response->parse_header();
+        if (response->checking()) {
+            if (response->is_result_304()) {
+                std::cout << "Response cached!\n";
+                struct client* client = clients.at(server->get_client_fd());
+                client->get_buffer() = cache[response->get_request()].get_text();
+
+                queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev){
+                    this->write_to_client(kev);
+                });
+                return;
+            } else {
+                std::cout << "Cache has been changed!\n";
+                response->checking() = false;
+            }
+        }
+
+        server->send_msg();
+        queue.add_event(server->get_client_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev){
+            this->write_to_client(kev);
+        });
+        
+        if (!response->is_cachable())
+            response->clear_text();
+        
+        queue.add_event(event.ident, EVFILT_READ, EV_ADD, [this](struct kevent& kev) {
+            this->read_from_server(kev);
+        });
     }
 }
 
@@ -220,8 +314,12 @@ void proxy_server::read_from_server(struct kevent& event) {
     
     std::cout << "Reading from server: " << event.ident << "!\n";
     struct server* server = servers[event.ident];
-    size_t size = server->read(event.data);
-    if (size > 0) {
+    std::string msg = server->read(event.data);
+    
+    if (msg.length() > 0) {
+        http_response* response = &responses.at(server->get_client_fd());
+        response->append_text(msg);
+        
         server->send_msg();
         queue.add_event(server->get_client_fd(), EVFILT_WRITE, EV_ENABLE, 0, 0, nullptr);
     }
@@ -255,16 +353,15 @@ void proxy_server::write_to_server(struct kevent& event) {
     if (getsockopt(static_cast<int>(event.ident), SOL_SOCKET, SO_ERROR, &err, &len) == -1 || err != 0) {
         //???: To stop proxy-server at that moment?
         disconnect_server(event);
-        perror("Connecting to server failed!");
+        perror("Connecting to server failed!\n");
         return;
     }
     
     struct server* server = servers[event.ident];
-    //TODO: may be server should have capacity?
     server->write();
     if (server->buffer_empty()) {
         queue.add_event(event.ident, EVFILT_READ, EV_ADD, [this](struct kevent& kev) {
-            this->read_from_server(kev);
+            this->read_header_from_server(kev);
         });
         queue.delete_event(event.ident, event.filter);
         queue.add_event(server->get_client_fd(), EVFILT_WRITE, EV_ADD, [this](struct kevent& kev) {
@@ -285,17 +382,20 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     
     std::cout <<"Client: " << request->get_client() << "\n";
     
-    if (request->is_canceled())
+    if (request->is_canceled()) {
+        delete request;
         return;
+    }
 
     client = clients.at(request->get_client());
-    requests.erase(client);
+    requests.erase(client->get_fd());
     
     if (request->is_error()) {
         client->get_buffer() = "HTTP/1.1 400 Bad Request\r\nServer: proxy\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: 164\r\nConnection: close\r\n\r\n<html>\r\n<head><title>400 Bad Request</title></head>\r\n<body bgcolor=\"white\">\r\n<center><h1>400 Bad Request</h1></center>\r\n<hr><center>proxy</center>\r\n</body>\r\n</html>";
         queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev) {
             this->write_to_client(kev);
         });
+        delete request;
         return;
     }
 
@@ -328,6 +428,7 @@ void proxy_server::on_host_resolved(struct kevent& event) {
 
         try {
             struct server* server = new struct server(server_socket);
+            server->set_host(request->get_host());
             client->bind(server);
             server->bind(client);
             servers[server->get_fd()] = server;

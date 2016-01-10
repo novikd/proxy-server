@@ -67,7 +67,9 @@ host_resolver::~host_resolver() {
 
 void host_resolver::write_to_pipe() noexcept {
     char tmp = 1;
+    std::unique_lock<std::mutex> locker{blocker};
     if (write(pipe_fd, &tmp, sizeof(tmp)) == -1) {
+        perror("Sending message to main thread error occurred!\n");
         stop();
     }
 }

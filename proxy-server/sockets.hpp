@@ -37,6 +37,9 @@ private:
 
 struct server;
 
+/*
+/ Client owns server.
+*/
 struct client {
     client(const client&) = delete;
     client& operator=(client const&) = delete;
@@ -49,6 +52,7 @@ struct client {
 
     void bind(struct server* new_server);
     void unbind();
+    void disconnect_server();
     
     std::string& get_buffer();
     size_t get_buffer_size() const noexcept;
@@ -60,6 +64,8 @@ struct client {
     
     void get_msg();
     void send_msg();
+    
+    std::string get_host() const noexcept;
     
     ~client();
 private:
@@ -79,17 +85,21 @@ struct server {
     void bind(struct client*);
     
     void append(std::string&);
+    std::string& get_buffer() noexcept;
     bool buffer_empty() const noexcept;
     
-    size_t read(size_t);
+    std::string read(size_t);
     size_t write();
     
     void send_msg();
     void get_msg();
     
+    void set_host(std::string const&);
+    std::string get_host() const noexcept;
+    
     ~server();
 private:
-    std::string buffer;
+    std::string buffer, host;
     socket_wrap socket;
     struct client* client;
 };

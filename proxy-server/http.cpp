@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include "http.hpp"
 
+/********** HTTP_REQUEST **********/
+
 http_request::http_request(std::string& str) :
     header(str),
     canceled(false),
@@ -36,6 +38,11 @@ http_request::http_request(http_request&& rhs) :
     error(false)
 {}
 
+void http_request::add_etag(std::string const& etag) {
+    header.resize(header.size() - 2);
+    header.append("If-None-Match: " + etag + "\r\n\r\n");
+}
+
 std::string http_request::get_host() const noexcept {
     return host;
 }
@@ -62,6 +69,28 @@ bool http_request::check_request_end(std::string const& msg) {
     
     i += 4;
     return msg.substr(i).length() == content_length;
+}
+
+bool http_request::is_already_cached(std::string const& request) {
+    if (request.find("GET") == std::string::npos)
+        return true;
+    
+    if (request.find("If-Match") != std::string::npos)
+        return true;
+
+    if (request.find("If-Modified-Since") != std::string::npos)
+        return true;
+    
+    if (request.find("If-None-Match") != std::string::npos)
+        return true;
+
+    if (request.find("If-Range") != std::string::npos)
+        return true;
+
+    if (request.find("If-Unmodified-Since") != std::string::npos)
+        return true;
+    
+    return false;
 }
 
 void http_request::set_client(int id) noexcept {
@@ -128,3 +157,112 @@ void http_request::parse_first_line() {
     begin += first_line.substr(i);
     header = begin + header;
 }
+
+/********** HTTP_RESPONSE **********/
+
+http_response::http_response() :
+    cached(true),
+    check(false)
+{}
+
+http_response::http_response(bool is_already_cached) :
+    cached(!is_already_cached),
+    check(false)
+{
+    if (cached)
+        std::cout << "Can be cached!\n";
+}
+
+http_response::http_response(http_response const& rhs) :
+    text(rhs.text),
+    ETag(rhs.ETag),
+    request(rhs.request),
+    cached(rhs.cached),
+    check(rhs.check)
+{}
+
+http_response& http_response::operator=(http_response const& rhs) {
+    text = rhs.text;
+    ETag = rhs.ETag;
+    request = rhs.request;
+    cached = rhs.cached;
+    check = rhs.check;
+    return *this;
+}
+
+bool http_response::check_header_end() const {
+    return text.find("\r\n\r\n") != std::string::npos;
+}
+
+void http_response::parse_header() {
+    if (cached) {
+        std::cout << "FIRST RESPONSE can be cached!\n";
+    } else {
+        std::cout << "FIRST RESPONSE can't be cached!\n";
+    }
+    size_t i = text.find("ETag: ");
+    cached = cached && i != std::string::npos;
+    if (cached) {
+        std::cout << "SECOND RESPONSE can be cached!\n";
+    } else {
+        std::cout << "SECOND RESPONSE can't be cached!\n";
+    }
+    if (cached) {
+        i += 6;
+        size_t j = 0;
+        while (text[i + j] != '\r') {
+            ++j;
+        }
+        ETag = text.substr(i, j);
+    }
+}
+
+bool http_response::is_result_304() const {
+    size_t i = text.find("\r\n");
+    size_t j = text.substr(0, i).find("304");
+    return j != std::string::npos;
+}
+
+void http_response::set_request(std::string const& str) {
+    request = str;
+}
+
+std::string& http_response::get_request() noexcept {
+    return request;
+}
+
+void http_response::delete_request() noexcept {
+    request.clear();
+}
+
+void http_response::force_append_text(std::string const& str) {
+    text.append(str);
+}
+
+void http_response::append_text(std::string const& str) {
+    if (cached && !check) {
+        text.append(str);
+    }
+}
+
+std::string& http_response::get_text() noexcept {
+    return text;
+}
+
+void http_response::clear_text() {
+    text.clear();
+}
+
+std::string& http_response::get_etag() noexcept {
+    return ETag;
+}
+
+bool& http_response::is_cachable() noexcept {
+    return cached;
+}
+
+bool& http_response::checking() noexcept {
+    return check;
+}
+
+http_response::~http_response() {}

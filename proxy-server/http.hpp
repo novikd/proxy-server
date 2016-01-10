@@ -17,10 +17,13 @@ struct http_request {
     http_request(http_request const&);
     http_request(http_request&&);
     
+    void add_etag(std::string const&);
+    
     std::string get_host() const noexcept;
     std::string get_header() const noexcept;
     
     static bool check_request_end(std::string const&);
+    static bool is_already_cached(std::string const&);
     
     void set_client(int) noexcept;
     int get_client() const noexcept;
@@ -47,16 +50,39 @@ private:
 
 struct http_response {
     
-    static bool check_header_end(std::string const&);
+    http_response();
+    http_response(bool);
+    http_response(http_response const&);
     
-    void append_header(std::string const&);
-    void append_body(std::string const&);
+    http_response& operator=(http_response const&);
     
-    void set_etag(std::string const&);
-    bool is_cachable() const;
+    bool check_header_end() const;
+    void parse_header();
+    bool is_result_304() const;
     
+    void set_request(std::string const&);
+    
+    void delete_request() noexcept;
+    std::string& get_request() noexcept;
+    
+    void force_append_text(std::string const&);
+    void append_text(std::string const&);
+    std::string& get_text() noexcept;
+    void clear_text();
+    
+    std::string& get_etag() noexcept;
+    bool& is_cachable() noexcept; //TODO: rename it
+    bool& checking() noexcept;
+    
+    ~http_response();
+
 private:
-    std::string header, body, ETag;
+    std::string text, ETag, request;
+    /*
+    / cached == True, if request can be cached
+    / check  == True, if we are checking current version
+    */
+    bool cached, check;
 };
 
 #endif /* http_hpp */

@@ -104,6 +104,10 @@ void client::unbind() {
     server = nullptr;
 }
 
+void client::disconnect_server() {
+    delete server;
+}
+
 std::string& client::get_buffer() {
     return buffer;
 }
@@ -155,8 +159,13 @@ void client::send_msg() {
     buffer.clear();
 }
 
+std::string client::get_host() const noexcept {
+    assert(server);
+    return server->get_host();
+}
+
 client::~client() {
-    delete server;
+    disconnect_server();
 }
 
 /******** SERVER ********/
@@ -182,20 +191,24 @@ void server::append(std::string& str) {
     buffer.append(str);
 }
 
+std::string& server::get_buffer() noexcept {
+    return buffer;
+}
+
 bool server::buffer_empty() const noexcept {
     return buffer.empty();
 }
 
-size_t server::read(size_t size) {
+std::string server::read(size_t size) {
     assert(client);
     if (!client->has_capcacity())
-        return 0;
+        return "";
     try {
         std::string s{socket.read(size)};
         buffer.append(s);
-        return s.size();
+        return s;
     } catch (...) {
-        return 0;
+        return "";
     }
 }
 
@@ -224,6 +237,13 @@ void server::send_msg() {
     buffer.clear();
 }
 
+void server::set_host(std::string const& str) {
+    host = str;
+}
+
+std::string server::get_host() const noexcept {
+    return host;
+}
 
 server::~server() {
     client->unbind();
