@@ -19,6 +19,7 @@
 
 struct host_resolver {
     host_resolver(const host_resolver&) = delete;
+    host_resolver& operator=(host_resolver const&) = delete;
     
     host_resolver(bool&);
     

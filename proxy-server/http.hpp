@@ -52,6 +52,7 @@ struct http_response {
     
     http_response();
     http_response(bool);
+    http_response(std::string const&);
     http_response(http_response const&);
     
     http_response& operator=(http_response const&);
@@ -77,6 +78,8 @@ struct http_response {
     ~http_response();
 
 private:
+    void parse_control_line();
+    
     std::string text, ETag, request;
     /*
     / cached == True, if request can be cached

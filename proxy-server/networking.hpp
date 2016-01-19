@@ -35,7 +35,6 @@ struct proxy_server {
     
     ~proxy_server();
 private:
-    static int init_socket(int);
     
     void disconnect_client(struct kevent&);
     void disconnect_server(struct kevent&);
@@ -50,7 +49,7 @@ private:
     void on_host_resolved(struct kevent&);
 
 /*********** FIELDS ***********/
-    //???: make pointers unique_ptr
+
     std::map<uintptr_t, client*> clients;
     std::map<uintptr_t, server*> servers;
     int main_socket, pipe_fd;
@@ -64,7 +63,5 @@ private:
     
     lru_cache<std::string, http_response> cache;
 };
-
-//TODO: handle all the errors
 
 #endif /* networking_hpp */

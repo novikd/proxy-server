@@ -168,10 +168,11 @@ http_response::http_response() :
 http_response::http_response(bool is_already_cached) :
     cached(!is_already_cached),
     check(false)
-{
-    if (cached)
-        std::cout << "Can be cached!\n";
-}
+{}
+
+http_response::http_response(std::string const& str) :
+    http_response(http_request::is_already_cached(str))
+{}
 
 http_response::http_response(http_response const& rhs) :
     text(rhs.text),
@@ -195,18 +196,9 @@ bool http_response::check_header_end() const {
 }
 
 void http_response::parse_header() {
-    if (cached) {
-        std::cout << "FIRST RESPONSE can be cached!\n";
-    } else {
-        std::cout << "FIRST RESPONSE can't be cached!\n";
-    }
     size_t i = text.find("ETag: ");
     cached = cached && i != std::string::npos;
-    if (cached) {
-        std::cout << "SECOND RESPONSE can be cached!\n";
-    } else {
-        std::cout << "SECOND RESPONSE can't be cached!\n";
-    }
+    parse_control_line();
     if (cached) {
         i += 6;
         size_t j = 0;
@@ -266,3 +258,13 @@ bool& http_response::checking() noexcept {
 }
 
 http_response::~http_response() {}
+
+void http_response::parse_control_line() {
+    size_t i = text.find("Cache-Control: ");
+    if (i == std::string::npos)
+        return;
+    
+    size_t j = text.find("\r", i);
+    std::string temp = text.substr(i, j - i);
+    cached = cached && (temp.find("private") == std::string::npos) && (temp.find("no-store") == std::string::npos);
+}
