@@ -51,6 +51,15 @@ std::string http_request::get_header() const noexcept {
     return header;
 }
 
+std::string http_request::get_url() const {
+    size_t i = header.find(" ");
+    while (header[i] == ' ') {
+        i++;
+    }
+    size_t j = header.find(" ", i);
+    return host + header.substr(i, j - i);
+}
+
 bool http_request::check_request_end(std::string const& msg) {
     size_t i = msg.find("\r\n\r\n");
     
@@ -170,14 +179,10 @@ http_response::http_response(bool is_already_cached) :
     check(false)
 {}
 
-http_response::http_response(std::string const& str) :
-    http_response(http_request::is_already_cached(str))
-{}
-
 http_response::http_response(http_response const& rhs) :
     text(rhs.text),
     ETag(rhs.ETag),
-    request(rhs.request),
+    request_url(rhs.request_url),
     cached(rhs.cached),
     check(rhs.check)
 {}
@@ -185,7 +190,7 @@ http_response::http_response(http_response const& rhs) :
 http_response& http_response::operator=(http_response const& rhs) {
     text = rhs.text;
     ETag = rhs.ETag;
-    request = rhs.request;
+    request_url = rhs.request_url;
     cached = rhs.cached;
     check = rhs.check;
     return *this;
@@ -196,9 +201,18 @@ bool http_response::check_header_end() const {
 }
 
 void http_response::parse_header() {
+    {
+        size_t i = text.find("Content-Type: ");
+        if (i != std::string:: npos) {
+            size_t j = text.find("\r", i);
+            if (text.substr(i, j - i).find("video") != std::string::npos)
+                cached = false;
+        }
+    }
     size_t i = text.find("ETag: ");
     cached = cached && i != std::string::npos;
     parse_control_line();
+    
     if (cached) {
         i += 6;
         size_t j = 0;
@@ -216,15 +230,15 @@ bool http_response::is_result_304() const {
 }
 
 void http_response::set_request(std::string const& str) {
-    request = str;
+    request_url = str;
 }
 
 std::string& http_response::get_request() noexcept {
-    return request;
+    return request_url;
 }
 
 void http_response::delete_request() noexcept {
-    request.clear();
+    request_url.clear();
 }
 
 void http_response::force_append_text(std::string const& str) {

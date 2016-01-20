@@ -47,6 +47,8 @@ private:
 
     void connect_client(struct kevent&);
     void on_host_resolved(struct kevent&);
+    
+    void update_timer(int);
 
 /*********** FIELDS ***********/
 

@@ -62,13 +62,7 @@ void events_queue::execute() {
     invalid.clear();
 
     for (int i = 0; i < amount; ++i) {
-        bool is_valid = true;
-        
-        for (auto e : invalid)
-            if (e == event_list[i].ident) {
-                is_valid = false;
-                break;
-            }
+        bool is_valid = invalid.find(event_list[i].ident) == invalid.end();
         
         if (is_valid) {
             std::function<void(struct kevent&)> handler = handlers.at(id{event_list[i]});
@@ -78,7 +72,7 @@ void events_queue::execute() {
 }
 
 void events_queue::invalidate_events(uintptr_t id) {
-    invalid.push_back(id);
+    invalid.insert(id);
 }
 
 events_queue::~events_queue() {

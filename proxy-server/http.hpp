@@ -21,6 +21,7 @@ struct http_request {
     
     std::string get_host() const noexcept;
     std::string get_header() const noexcept;
+    std::string get_url() const;
     
     static bool check_request_end(std::string const&);
     static bool is_already_cached(std::string const&);
@@ -52,7 +53,6 @@ struct http_response {
     
     http_response();
     http_response(bool);
-    http_response(std::string const&);
     http_response(http_response const&);
     
     http_response& operator=(http_response const&);
@@ -80,7 +80,7 @@ struct http_response {
 private:
     void parse_control_line();
     
-    std::string text, ETag, request;
+    std::string text, ETag, request_url;
     /*
     / cached == True, if request can be cached
     / check  == True, if we are checking current version

@@ -12,7 +12,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/event.h>
-#include <vector>
+#include <set>
 #include <functional>
 #include <map>
 
@@ -56,7 +56,7 @@ private:
     static const uint16_t EVLIST_SIZE = 512;
     int kq;
     struct kevent event_list[EVLIST_SIZE];
-    std::vector<uintptr_t> invalid;
+    std::set<uintptr_t> invalid;
     std::map<id, std::function<void(struct kevent&)> > handlers;
 };
 
