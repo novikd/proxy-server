@@ -155,8 +155,8 @@ void proxy_server::stop() {
 }
 
 void proxy_server::handle_sugnal(int sig, std::function<void(struct kevent&)> handler) {
-    signal(sig, SIG_IGN);
     queue.add_event(sig, EVFILT_SIGNAL, EV_ADD, handler);
+    signal(sig, SIG_IGN);
 }
 
 proxy_server::~proxy_server() {

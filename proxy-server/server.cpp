@@ -7,6 +7,7 @@
 //
 
 #include "networking.hpp"
+#include <signal.h>
 
 const unsigned short PORT = 2539;
 
