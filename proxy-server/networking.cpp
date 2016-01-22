@@ -25,7 +25,7 @@ namespace sockets {
         if (setsockopt(new_socket, SOL_SOCKET, SO_REUSEPORT, &set, sizeof(set)) == -1) {
             perror("\nSetting main socket SO_REUSEPORT error occurred!\n");
         };
-        
+
         sockaddr_in addr;
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
@@ -85,6 +85,7 @@ proxy_server::proxy_server(int port) :
 main_socket(sockets::create_listening_socket(port)),
     queue(),
     work(true),
+    stoped(false),
     resolver(work)
 {
     /*
@@ -119,13 +120,6 @@ main_socket(sockets::create_listening_socket(port)),
     queue.add_event(pipe_fd, EVFILT_READ, EV_ADD, [this](struct kevent& kev) {
         this->on_host_resolved(kev);
     });
-    
-    /* Event for signals handling */
-//    signal(SIGINT, SIG_IGN); //Turned off, because XCode crashes on pressing STOP button
-    queue.add_event(SIGINT, EVFILT_SIGNAL, EV_ADD, [this](struct kevent& event) {
-        std::cout << "SIGINT CAUGHT!\n";
-        this->hard_stop();
-    });
 }
 
 void proxy_server::run() {
@@ -155,16 +149,17 @@ void proxy_server::hard_stop() {
 }
 
 void proxy_server::stop() {
+    queue.invalidate_events(main_socket);
     queue.delete_event(main_socket, EVFILT_READ);
+    stoped = true;
+}
+
+void proxy_server::handle_sugnal(int sig, std::function<void(struct kevent&)> handler) {
+    signal(sig, SIG_IGN);
+    queue.add_event(sig, EVFILT_SIGNAL, EV_ADD, handler);
 }
 
 proxy_server::~proxy_server() {
-    /*
-    / Event for connecting is already deleted
-    */
-    queue.delete_event(SIGINT, EVFILT_SIGNAL);
-    queue.delete_event(pipe_fd, EVFILT_READ);
-
     /*
      / Deleting all requests
      */
@@ -222,6 +217,8 @@ void proxy_server::disconnect_client(struct kevent& event) {
     queue.delete_event(event.ident, EVFILT_TIMER);
     
     delete client;
+    if (stoped && clients.size() == 0)
+        hard_stop();
 }
 
 void proxy_server::disconnect_server(struct kevent& event) {

@@ -24,14 +24,18 @@
 #include <iostream>
 
 struct proxy_server {
-    
+
     proxy_server(int);
+    proxy_server(proxy_server const&) = delete;
+    proxy_server& operator=(proxy_server const&) = delete;
 
     void run();
     
     void start();
     void hard_stop();
     void stop();
+    
+    void handle_sugnal(int, std::function<void(struct kevent&)>);
     
     ~proxy_server();
 private:
@@ -57,7 +61,7 @@ private:
     int main_socket, pipe_fd;
     
     events_queue queue;
-    bool work;
+    bool work, stoped;
     
     host_resolver resolver;
     std::map<int, http_request*> requests;
