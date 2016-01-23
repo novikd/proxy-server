@@ -16,21 +16,21 @@
 
 #include "http.hpp"
 #include "lru_cache.hpp"
+#include "sockets.hpp"
 
 struct host_resolver {
     host_resolver(const host_resolver&) = delete;
     host_resolver& operator=(host_resolver const&) = delete;
     
-    host_resolver(bool&);
+    host_resolver();
     
     void set_fd(int) noexcept;
     int get_fd() const noexcept;
     
     void push(std::unique_ptr<http_request>);
     std::unique_ptr<http_request> pop();
-    
-    std::mutex& get_mutex() noexcept;
-    void notify();
+
+    void cancel(http_request*);
     void stop();
     
     ~host_resolver();
@@ -40,8 +40,8 @@ private:
     void resolve();
 
 /*********** FIELDS ***********/
-    int pipe_fd;
-    bool& work;
+    file_descriptor pipe_fd;
+    bool work;
     std::mutex blocker;
     std::condition_variable cv;
     std::queue<std::unique_ptr<http_request>> pending, answers;

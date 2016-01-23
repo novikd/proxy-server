@@ -17,40 +17,58 @@
 #include <vector>
 #include <cassert>
 
-#include "socket_exception.hpp"
+#include "exceptions.hpp"
 #include "sockets.hpp"
 
-/******** SOCKET ********/
+/******** DESCRIPTOR ********/
 
-socket_wrap::socket_wrap(socket_wrap const& other) {
-    fd = other.fd;
+file_descriptor::file_descriptor(file_descriptor&& rhs) :
+    fd(rhs.fd)
+{
+    rhs.fd = 0;
 }
 
-socket_wrap::socket_wrap() {}
-
-socket_wrap::socket_wrap(int fd) :
+file_descriptor::file_descriptor(int fd) :
     fd(fd)
 {}
 
-socket_wrap socket_wrap::connect(int accept_fd) {
-    socket_wrap temp;
-    
+void file_descriptor::set_fd(int new_fd) noexcept {
+    fd = new_fd;
+}
+
+int file_descriptor::get_fd() const noexcept {
+    return fd;
+}
+
+file_descriptor::~file_descriptor() {
+    if (close(fd) == -1) {
+        perror("Closing file descriptor error occurred!");
+    }
+    std::cout << "File descriptor: " << fd << " closed!\n";
+}
+
+/******** SOCKET ********/
+
+socket_wrap::socket_wrap(int fd) :
+    file_descriptor(fd)
+{}
+
+socket_wrap socket_wrap::accept(int accept_fd) {
     sockaddr_in addr;
     socklen_t len = sizeof(addr);
     
-    temp.fd = accept(accept_fd, (sockaddr*) &addr, &len);
-    if (temp.fd == -1) {
-        throw socket_exception("Accepting connection error occurred!");
-    }
+    int fd = ::accept(accept_fd, (sockaddr*) &addr, &len);
+    if (fd == -1)
+        throw custom_exception("Connecting error occurred!");
     
-    return temp;
+    return socket_wrap(fd);
 }
 
 ptrdiff_t socket_wrap::write(std::string const& msg) {
     ptrdiff_t length = send(fd, msg.data(), msg.size(), 0);
     
     if (length == -1) {
-        throw socket_exception("Writing message error occurred!");
+        throw custom_exception("Writing message error occurred!");
     }
     
     return length;
@@ -60,25 +78,18 @@ std::string socket_wrap::read(size_t buffer_size) {
     std::vector<char> buffer(buffer_size);
     ptrdiff_t length = recv(fd, buffer.data(), buffer_size, 0);
     if (length == -1) {
-        throw socket_exception("Reading message error occurred!");
+        throw custom_exception("Reading message error occurred!");
     }
     
     return std::string(buffer.cbegin(), buffer.cbegin() + length);
 }
 
-int socket_wrap::get_fd() const noexcept {
-    return fd;
-}
-
-socket_wrap::~socket_wrap() {
-    // TODO: check error and log
-    close(fd);
-}
+socket_wrap::~socket_wrap() {}
 
 /******** CLIENT ********/
 
 client::client(int accept_fd) :
-    socket(socket_wrap::connect(accept_fd)),
+    socket(socket_wrap::accept(accept_fd)),
     server(nullptr)
 {}
 
@@ -92,21 +103,16 @@ int client::get_server_fd() const noexcept {
 }
 
 bool client::has_server() const noexcept {
-    return server;
+    return server.get() != nullptr;
 }
 
 void client::bind(struct server* new_server) {
-    delete server;
-    server = new_server;
+    server.reset(new_server);
     server->bind(this);
 }
 
 void client::unbind() {
-    server = nullptr;
-}
-
-void client::disconnect_server() {
-    delete server;
+    server.reset(nullptr);
 }
 
 std::string& client::get_buffer() {
@@ -166,7 +172,8 @@ std::string client::get_host() const noexcept {
 }
 
 client::~client() {
-    disconnect_server();
+    if (server)
+        unbind();
 }
 
 /******** SERVER ********/
@@ -246,6 +253,9 @@ std::string server::get_host() const noexcept {
     return host;
 }
 
-server::~server() {
+void server::disconnect() {
+    assert(client);
     client->unbind();
 }
+
+server::~server() {}

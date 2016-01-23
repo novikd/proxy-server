@@ -14,25 +14,38 @@
 
 const uint32_t BUFFER_SIZE = 20000;
 
-struct socket_wrap {
-
-    socket_wrap& operator=(const socket_wrap&) = delete;
-
-    socket_wrap();
-    socket_wrap(const socket_wrap&);
+struct file_descriptor {
     
-    socket_wrap(int fd);
+    file_descriptor& operator=(const file_descriptor&) = delete;
+    file_descriptor(const file_descriptor&) = delete;
+    
+    file_descriptor() = default;
+    file_descriptor(int fd);
+    file_descriptor(file_descriptor&&);
 
-    static socket_wrap connect(int);
+    void set_fd(int) noexcept;
+    int get_fd() const noexcept;
+    
+    ~file_descriptor();
+    
+protected:
+    int fd;
+};
+
+struct socket_wrap : public file_descriptor {
+    socket_wrap& operator=(const socket_wrap&) = delete;
+    socket_wrap(const socket_wrap&) = delete;
+
+    socket_wrap() = default;
+    socket_wrap(int fd);
+    socket_wrap(socket_wrap&&) = default;
+    
+    static socket_wrap accept(int);
     
     ptrdiff_t write(std::string const& msg);
     std::string read(size_t buffer_size);
-    int get_fd() const noexcept;
     
     ~socket_wrap();
-
-private:
-    int fd;
 };
 
 struct server;
@@ -52,7 +65,6 @@ struct client {
 
     void bind(struct server* new_server);
     void unbind();
-    void disconnect_server();
     
     std::string& get_buffer();
     size_t get_buffer_size() const noexcept;
@@ -71,7 +83,7 @@ struct client {
 private:
     std::string buffer;
     socket_wrap socket;
-    struct server* server; // TODO: unique_ptr
+    std::unique_ptr<struct server> server;
 };
 
 struct server {
@@ -96,6 +108,8 @@ struct server {
     
     void set_host(std::string const&);
     std::string get_host() const noexcept;
+    
+    void disconnect();
     
     ~server();
 private:

@@ -34,9 +34,8 @@ struct proxy_server {
     void start();
     void hard_stop();
     void stop();
-    
-    // TODO: typo
-    void handle_sugnal(int, std::function<void(struct kevent&)>);
+
+    void handle_signal(int, std::function<void(struct kevent&)>);
     
     ~proxy_server();
 private:
@@ -57,12 +56,12 @@ private:
 
 /*********** FIELDS ***********/
 
-    std::map<uintptr_t, client*> clients; // TODO: replace with unique_ptr
+    std::map<uintptr_t, std::unique_ptr<client>> clients;
     std::map<uintptr_t, server*> servers;
-    int main_socket, pipe_fd; // TODO: wrap into a RAII class
-    
+    file_descriptor main_socket, pipe_fd;
+
     events_queue queue;
-    bool work, stoped; // TODO: typo
+    bool work, stopped; // TODO: typo
     
     host_resolver resolver;
     std::map<int, http_request*> requests;

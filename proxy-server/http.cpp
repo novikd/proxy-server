@@ -145,8 +145,6 @@ void http_request::parse_request() {
     i += 6;
     size_t j = header.find("\r\n", i);
     host = header.substr(i, j - i);
-    i = header.find("Connection:");
-    i += 12;
     std::cout << "Host for request: " << host << "\n";
 }
 

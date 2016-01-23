@@ -16,19 +16,19 @@
 #include <functional>
 #include <map>
 
+#include "sockets.hpp"
+
 struct events_queue {
     events_queue(events_queue const&) = delete;
     events_queue& operator=(events_queue const&) = delete;
     
     events_queue();
     
-    int add_event(const struct kevent& kev);
-    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata);
-    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, std::function<void(struct kevent&)> handler);
-    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, intptr_t data, std::function<void(struct kevent&)> handler);
-    int add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, std::function<void(struct kevent&)> handler);
+    void add_event(const struct kevent& kev);
+    void add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata);
+    void add_event(std::function<void(struct kevent&)> handler, uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags = 0, intptr_t data = 0);
 
-    int delete_event(uintptr_t ident, int16_t filter);
+    void delete_event(uintptr_t ident, int16_t filter);
     
     int occured();
     void execute();
@@ -54,7 +54,7 @@ private:
 
     
     static const uint16_t EVLIST_SIZE = 512;
-    int kq; // TODO: wrap in a RAII class
+    file_descriptor kq;
     struct kevent event_list[EVLIST_SIZE];
     std::set<uintptr_t> invalid;
     std::map<id, std::function<void(struct kevent&)> > handlers;

@@ -11,13 +11,13 @@
 
 #include <exception>
 #include <iostream>
-//TODO: rename this class and reuse it in all parts of programm
-struct socket_exception : std::exception {
-    socket_exception(const std::string& str) :
+
+struct custom_exception : std::exception {
+    custom_exception(const std::string& str) :
     error_info(str)
     {}
     
-    socket_exception(std::string&& msg) :
+    custom_exception(std::string&& msg) :
     error_info(std::move(msg))
     {}
     

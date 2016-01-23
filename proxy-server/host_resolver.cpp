@@ -11,11 +11,12 @@
 #include <netdb.h>
 #include <cassert>
 #include <fcntl.h>
+#include <csignal>
 
 #include "host_resolver.hpp"
 
-host_resolver::host_resolver(bool& flag) :
-    work(flag)
+host_resolver::host_resolver() :
+    work(true)
 {
     for (int i = 0; i < 4; ++i) {
         threads.push_back(std::thread([this]() {
@@ -25,16 +26,17 @@ host_resolver::host_resolver(bool& flag) :
 }
 
 void host_resolver::set_fd(int fd) noexcept {
-    pipe_fd = fd;
+    pipe_fd.set_fd(fd);
 }
 
 int host_resolver::get_fd() const noexcept {
-    return pipe_fd;
+    return pipe_fd.get_fd();
 }
 
 void host_resolver::push(std::unique_ptr<http_request> request) {
     std::unique_lock<std::mutex> locker{blocker};
     pending.push(std::move(request));
+    cv.notify_one();
 }
 
 std::unique_ptr<http_request> host_resolver::pop() {
@@ -44,33 +46,33 @@ std::unique_ptr<http_request> host_resolver::pop() {
     return request;
 }
 
-std::mutex& host_resolver::get_mutex() noexcept {
-    return blocker;
-}
-
-void host_resolver::notify() {
-    cv.notify_one();
+void host_resolver::cancel(http_request* request) {
+    std::unique_lock<std::mutex> locker{blocker};
+    request->cancel();
 }
 
 void host_resolver::stop() {
     std::unique_lock<std::mutex> locker{blocker};
     work = false;
-}
-
-host_resolver::~host_resolver() {
-    close(pipe_fd);
     cv.notify_all();
+    locker.unlock();
+
     for (int i = 0; i < 4; ++i)
         if (threads[i].joinable())
             threads[i].join();
 }
 
+host_resolver::~host_resolver() {
+    stop();
+}
+
 void host_resolver::write_to_pipe() noexcept {
     char tmp = 1;
     std::unique_lock<std::mutex> locker{blocker};
-    if (write(pipe_fd, &tmp, sizeof(tmp)) == -1) {
+    if (write(pipe_fd.get_fd(), &tmp, sizeof(tmp)) == -1) {
         perror("Sending message to main thread error occurred!\n");
         stop();
+        raise(SIGINT); //Something is wrong. Lets stop the program
     }
 }
 

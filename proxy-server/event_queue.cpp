@@ -7,6 +7,7 @@
 //
 #include <iostream>
 
+#include "exceptions.hpp"
 #include "event_queue.hpp"
 
 /********** EVENTS_QUEUE **********/
@@ -15,46 +16,40 @@ events_queue::events_queue() :
     kq(kqueue())
 {}
 
-int events_queue::add_event(const struct kevent& kev) {
-    return kevent(kq, &kev, 1, nullptr, 0, nullptr);
+void events_queue::add_event(const struct kevent& kev) {
+    if (kevent(kq.get_fd(), &kev, 1, nullptr, 0, nullptr) == -1)
+        throw custom_exception("Kqueue error occurred!");
 }
 
-int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata) {
+void events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata) {
     struct kevent kev;
     EV_SET(&kev, ident, filter, flags, fflags, data, udata);
-    // TODO: throw exception if kevent fails
-    return kevent(kq, &kev, 1, nullptr, 0, nullptr);
+
+    if (kevent(kq.get_fd(), &kev, 1, nullptr, 0, nullptr) == -1)
+        throw custom_exception("Kqueue error occurred!");
 }
 
-int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, std::function<void(struct kevent&)> handler) {
-    return add_event(ident, filter, flags, 0, handler);
-}
-
-int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, intptr_t data, std::function<void(struct kevent&)> handler) {
-    return add_event(ident, filter, flags, 0, data, handler);
-}
-
-int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, std::function<void(struct kevent&)> handler) {
+void events_queue::add_event(std::function<void(struct kevent&)> handler, uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data) {
     handlers[id{ident, filter}] = handler;
-    return add_event(ident, filter, flags, fflags, data, nullptr);
+    
+    add_event(ident, filter, flags, fflags, data, nullptr);
 }
 
 
-int events_queue::delete_event(uintptr_t ident, int16_t filter) {
+void events_queue::delete_event(uintptr_t ident, int16_t filter) {
     auto it = handlers.find(id{ident, filter});
     if (it != handlers.end()) {
         handlers.erase(it);
-        return add_event(ident, filter, EV_DELETE, 0, 0, nullptr);
+        add_event(ident, filter, EV_DELETE, 0, 0, nullptr);
     }
-    return 0;
 }
 
 int events_queue::occured() {
-    return kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
+    return kevent(kq.get_fd(), nullptr, 0, event_list, EVLIST_SIZE, nullptr);
 }
 
 void events_queue::execute() {
-    int amount = kevent(kq, nullptr, 0, event_list, EVLIST_SIZE, nullptr);
+    int amount = kevent(kq.get_fd(), nullptr, 0, event_list, EVLIST_SIZE, nullptr);
     
     if (amount == -1) {
         perror("Getting number of events error!\n");
@@ -76,9 +71,7 @@ void events_queue::invalidate_events(uintptr_t id) {
     invalid.insert(id);
 }
 
-events_queue::~events_queue() {
-    close(kq);
-}
+events_queue::~events_queue() {}
 
 /********** ID **********/
 

@@ -19,11 +19,11 @@ int main() {
 / Turned off, because XCode crashes on pressing STOP button
 / It sends SIGINT and after that sends SIGKILL
 */
-    proxy.handle_sugnal(SIGINT, [&proxy](struct kevent& kev) {
+    proxy.handle_signal(SIGINT, [&proxy](struct kevent& kev) {
         std::cout << "\nSIGINT\n";
         proxy.hard_stop();
     });
-    proxy.handle_sugnal(SIGTERM, [&proxy](struct kevent& kev) {
+    proxy.handle_signal(SIGTERM, [&proxy](struct kevent& kev) {
         std::cout << "\nSIGTERM\n";
         proxy.stop();
     });
