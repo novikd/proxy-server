@@ -57,9 +57,9 @@ private:
 
 /*********** FIELDS ***********/
 
-    std::map<uintptr_t, client*> clients;
+    std::map<uintptr_t, client*> clients; // TODO: replace with unique_ptr
     std::map<uintptr_t, server*> servers;
-    int main_socket, pipe_fd;
+    int main_socket, pipe_fd; // TODO: wrap into a RAII class
     
     events_queue queue;
     bool work, stoped; // TODO: typo

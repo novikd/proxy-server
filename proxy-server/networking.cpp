@@ -138,6 +138,7 @@ void proxy_server::run() {
             queue.execute();
         }
     } catch(...) {
+        // TODO: what is the point of this hard_stop?
         hard_stop();
     }
 }
@@ -193,10 +194,14 @@ void proxy_server::disconnect_client(struct kevent& event) {
     struct client* client = clients[event.ident];
     
     {
-        std::unique_lock<std::mutex> locker{resolver.get_mutex()};
         auto it = requests.find(client->get_fd());
         if (it != requests.end()) {
-            it->second->cancel();
+            {
+                // TODO: make this a function of task_resolver
+                // TODO: remove task_resolver::get_mutex()
+                std::unique_lock<std::mutex> locker{resolver.get_mutex()};
+                it->second->cancel();
+            }
             requests.erase(client->get_fd());
         }
     }
@@ -282,7 +287,7 @@ void proxy_server::read_from_client(struct kevent& event) {
     
     if (http_request::check_request_end(client->get_buffer())) {
         responses[client->get_fd()] = http_response(http_request::is_already_cached(client->get_buffer()));
-        
+
         std::unique_ptr<http_request> request(new (std::nothrow) http_request(client->get_buffer()));
         if (!request) {
             client->get_buffer() = BAD_REQUEST;
@@ -316,6 +321,7 @@ void proxy_server::read_from_client(struct kevent& event) {
 
         std::cout << request->get_header();
         
+        // merge host_resolver::push with host_resolver::notify
         resolver.push(std::move(request));
         resolver.notify();
     }

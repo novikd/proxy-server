@@ -65,7 +65,7 @@ bool http_request::check_request_end(std::string const& msg) {
     
     if (i == std::string::npos)
         return false;
-    if (msg.find("POST") == std::string::npos)
+    if (msg.find("POST") == std::string::npos) // TODO: WAT?
         return true;
     
     size_t j = msg.find("Content-Length: ");

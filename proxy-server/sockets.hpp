@@ -71,7 +71,7 @@ struct client {
 private:
     std::string buffer;
     socket_wrap socket;
-    struct server* server;
+    struct server* server; // TODO: unique_ptr
 };
 
 struct server {
