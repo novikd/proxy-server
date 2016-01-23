@@ -71,6 +71,7 @@ int socket_wrap::get_fd() const noexcept {
 }
 
 socket_wrap::~socket_wrap() {
+    // TODO: check error and log
     close(fd);
 }
 
@@ -137,7 +138,7 @@ size_t client::read(size_t size) {
 size_t client::write() {
     try {
         size_t length = socket.write(buffer);
-        buffer = buffer.substr(length);
+        buffer.erase(buffer.begin(), buffer.begin() + length);
         if (server)
             get_msg();
         return length;

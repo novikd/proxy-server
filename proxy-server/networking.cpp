@@ -19,6 +19,7 @@ const std::string NOT_FOUND = "HTTP/1.1 404 Not Found\r\nServer: proxy\r\nConten
 
 namespace sockets {
     int create_listening_socket(int port) {
+        // TODO: check error
         int new_socket = socket(PF_INET, SOCK_STREAM, 0);
         
         const int set = 1;
@@ -97,14 +98,15 @@ main_socket(sockets::create_listening_socket(port)),
     int fds[2];
     if (pipe(fds) == -1) {
         perror("Creating a pipe error occurred!\n");
+        // TODO: exception
     }
 
     if (fcntl(fds[0], F_SETFL, O_NONBLOCK) == -1) {
-        hard_stop();
+        hard_stop(); // TODO: exception
         perror("Making pipe-socket for listening non-blocking error occurred!\n");
     }
     if (fcntl(fds[1], F_SETFL, O_NONBLOCK) == -1) {
-        hard_stop();
+        hard_stop(); // TODO: exception
         perror("Making pipe-socket for writing non-blocking error occurred!\n");
     }
     
@@ -136,6 +138,7 @@ void proxy_server::run() {
             queue.execute();
         }
     } catch(...) {
+        // TODO: what is the point of this hard_stop?
         hard_stop();
     }
 }
@@ -145,6 +148,12 @@ void proxy_server::start() {
 }
 
 void proxy_server::hard_stop() {
+    // TODO: setting this to false does not guarantee that
+    // all threads of host_resolver will finish requests processing
+    // by the time we start deleting requests
+
+    // we should have some function (e.g. host_resolver::stop) that
+    // returns only when all threads of resolver are terminated
     work = false;
 }
 
@@ -185,10 +194,14 @@ void proxy_server::disconnect_client(struct kevent& event) {
     struct client* client = clients[event.ident];
     
     {
-        std::unique_lock<std::mutex> locker{resolver.get_mutex()};
         auto it = requests.find(client->get_fd());
         if (it != requests.end()) {
-            it->second->cancel();
+            {
+                // TODO: make this a function of task_resolver
+                // TODO: remove task_resolver::get_mutex()
+                std::unique_lock<std::mutex> locker{resolver.get_mutex()};
+                it->second->cancel();
+            }
             requests.erase(client->get_fd());
         }
     }
@@ -274,13 +287,14 @@ void proxy_server::read_from_client(struct kevent& event) {
     
     if (http_request::check_request_end(client->get_buffer())) {
         responses[client->get_fd()] = http_response(http_request::is_already_cached(client->get_buffer()));
-        
+
         std::unique_ptr<http_request> request(new (std::nothrow) http_request(client->get_buffer()));
         if (!request) {
             client->get_buffer() = BAD_REQUEST;
             queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE,  [this](struct kevent& kev) {
                 this->write_to_client(kev);
             });
+            return;
         }
 
         responses[client->get_fd()].set_request(request->get_url());
@@ -307,6 +321,7 @@ void proxy_server::read_from_client(struct kevent& event) {
 
         std::cout << request->get_header();
         
+        // merge host_resolver::push with host_resolver::notify
         resolver.push(std::move(request));
         resolver.notify();
     }

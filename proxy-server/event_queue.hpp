@@ -54,7 +54,7 @@ private:
 
     
     static const uint16_t EVLIST_SIZE = 512;
-    int kq;
+    int kq; // TODO: wrap in a RAII class
     struct kevent event_list[EVLIST_SIZE];
     std::set<uintptr_t> invalid;
     std::map<id, std::function<void(struct kevent&)> > handlers;
