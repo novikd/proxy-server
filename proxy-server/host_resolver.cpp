@@ -32,14 +32,14 @@ int host_resolver::get_fd() const noexcept {
     return pipe_fd;
 }
 
-void host_resolver::push(http_request* request) {
+void host_resolver::push(std::unique_ptr<http_request> request) {
     std::unique_lock<std::mutex> locker{blocker};
-    pending.push(request);
+    pending.push(std::move(request));
 }
 
-http_request* host_resolver::pop() {
+std::unique_ptr<http_request> host_resolver::pop() {
     std::unique_lock<std::mutex> locker{blocker};
-    http_request* request = std::move(answers.front());
+    std::unique_ptr<http_request> request = std::move(answers.front());
     answers.pop();
     return request;
 }
@@ -85,7 +85,7 @@ void host_resolver::resolve() {
             break;
         
         std::cout << "START TO RESOLVE: " << std::this_thread::get_id() << "\n";
-        auto request = pending.front();
+        auto request = std::move(pending.front());
         pending.pop();
         
         sockaddr result;
@@ -126,7 +126,7 @@ void host_resolver::resolve() {
         
         std::cout << "RESOLVED!\n";
         locker.lock();
-        answers.push(request);
+        answers.push(std::move(request));
         locker.unlock();
         
         write_to_pipe();

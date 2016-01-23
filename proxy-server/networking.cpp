@@ -163,9 +163,9 @@ proxy_server::~proxy_server() {
     /*
      / Deleting all requests
      */
-    for (auto elem : requests) {
-        delete elem.second;
-    }
+    //for (auto elem : requests) {
+    //    delete elem.second;
+    //}
 
     /*
     / Deleting clients and servers
@@ -275,7 +275,7 @@ void proxy_server::read_from_client(struct kevent& event) {
     if (http_request::check_request_end(client->get_buffer())) {
         responses[client->get_fd()] = http_response(http_request::is_already_cached(client->get_buffer()));
         
-        http_request* request = new (std::nothrow) http_request(client->get_buffer());
+        std::unique_ptr<http_request> request(new (std::nothrow) http_request(client->get_buffer()));
         if (!request) {
             client->get_buffer() = BAD_REQUEST;
             queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE,  [this](struct kevent& kev) {
@@ -297,18 +297,17 @@ void proxy_server::read_from_client(struct kevent& event) {
                 queue.add_event(client->get_server_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev) {
                     this->write_to_server(kev);
                 });
-                delete request;
                 return;
             } else {
                 client->disconnect_server();
             }
         }
         request->set_client(client->get_fd());
-        requests[client->get_fd()] = request;
+        requests[client->get_fd()] = request.get();
 
         std::cout << request->get_header();
         
-        resolver.push(request);
+        resolver.push(std::move(request));
         resolver.notify();
     }
 }
@@ -435,12 +434,11 @@ void proxy_server::on_host_resolved(struct kevent& event) {
         perror("Getting message from another thread error occurred!\n");
     }
     
-    http_request* request{std::move(resolver.pop())};
+    std::unique_ptr<http_request> request = resolver.pop();
     
     std::cout <<"Client: " << request->get_client() << "\n";
     
     if (request->is_canceled()) {
-        delete request;
         return;
     }
 
@@ -453,7 +451,6 @@ void proxy_server::on_host_resolved(struct kevent& event) {
         queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, [this](struct kevent& kev) {
             this->write_to_client(kev);
         });
-        delete request;
         return;
     }
 
@@ -463,14 +460,12 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     if (server_socket == -1) {
         client->get_buffer() = BAD_REQUEST;
         queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        delete request;
         return;
     }
 
     struct server* server = new (std::nothrow) struct server(server_socket);
     if (!server) {
         perror("\nCreating new server error occurred!\n");
-        delete request;
         return;
     }
     
@@ -482,7 +477,6 @@ void proxy_server::on_host_resolved(struct kevent& event) {
         this->write_to_server(kev);
     });
 
-    delete request;
     client->send_msg();
 }
 

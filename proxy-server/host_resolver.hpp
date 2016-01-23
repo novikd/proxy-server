@@ -26,8 +26,8 @@ struct host_resolver {
     void set_fd(int) noexcept;
     int get_fd() const noexcept;
     
-    void push(http_request*);
-    http_request* pop();
+    void push(std::unique_ptr<http_request>);
+    std::unique_ptr<http_request> pop();
     
     std::mutex& get_mutex() noexcept;
     void notify();
@@ -44,7 +44,7 @@ private:
     bool& work;
     std::mutex blocker;
     std::condition_variable cv;
-    std::queue<http_request*> pending, answers;
+    std::queue<std::unique_ptr<http_request>> pending, answers;
     lru_cache<std::string, sockaddr> hosts;
     std::vector<std::thread> threads;
 };
