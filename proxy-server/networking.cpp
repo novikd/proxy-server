@@ -19,6 +19,7 @@ const std::string NOT_FOUND = "HTTP/1.1 404 Not Found\r\nServer: proxy\r\nConten
 
 namespace sockets {
     int create_listening_socket(int port) {
+        // TODO: check error
         int new_socket = socket(PF_INET, SOCK_STREAM, 0);
         
         const int set = 1;
@@ -97,14 +98,15 @@ main_socket(sockets::create_listening_socket(port)),
     int fds[2];
     if (pipe(fds) == -1) {
         perror("Creating a pipe error occurred!\n");
+        // TODO: exception
     }
 
     if (fcntl(fds[0], F_SETFL, O_NONBLOCK) == -1) {
-        hard_stop();
+        hard_stop(); // TODO: exception
         perror("Making pipe-socket for listening non-blocking error occurred!\n");
     }
     if (fcntl(fds[1], F_SETFL, O_NONBLOCK) == -1) {
-        hard_stop();
+        hard_stop(); // TODO: exception
         perror("Making pipe-socket for writing non-blocking error occurred!\n");
     }
     
@@ -145,6 +147,12 @@ void proxy_server::start() {
 }
 
 void proxy_server::hard_stop() {
+    // TODO: setting this to false does not guarantee that
+    // all threads of host_resolver will finish requests processing
+    // by the time we start deleting requests
+
+    // we should have some function (e.g. host_resolver::stop) that
+    // returns only when all threads of resolver are terminated
     work = false;
 }
 
@@ -281,6 +289,7 @@ void proxy_server::read_from_client(struct kevent& event) {
             queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE,  [this](struct kevent& kev) {
                 this->write_to_client(kev);
             });
+            return;
         }
 
         responses[client->get_fd()].set_request(request->get_url());

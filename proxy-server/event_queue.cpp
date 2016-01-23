@@ -22,6 +22,7 @@ int events_queue::add_event(const struct kevent& kev) {
 int events_queue::add_event(uintptr_t ident, int16_t filter, uint16_t flags, uint32_t fflags, intptr_t data, void* udata) {
     struct kevent kev;
     EV_SET(&kev, ident, filter, flags, fflags, data, udata);
+    // TODO: throw exception if kevent fails
     return kevent(kq, &kev, 1, nullptr, 0, nullptr);
 }
 
