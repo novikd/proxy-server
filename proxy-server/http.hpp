@@ -72,7 +72,7 @@ struct http_response {
     void clear_text();
     
     std::string& get_etag() noexcept;
-    bool& is_cachable() noexcept; //TODO: rename it
+    bool& is_cachable() noexcept; // TODO: rename it
     bool& checking() noexcept;
     
     ~http_response();

@@ -22,10 +22,14 @@
 
 /******** DESCRIPTOR ********/
 
+file_descriptor::file_descriptor() :
+    fd(-1)
+{}
+
 file_descriptor::file_descriptor(file_descriptor&& rhs) :
     fd(rhs.fd)
 {
-    rhs.fd = 0;
+    rhs.fd = -1;
 }
 
 file_descriptor::file_descriptor(int fd) :
@@ -41,6 +45,9 @@ int file_descriptor::get_fd() const noexcept {
 }
 
 file_descriptor::~file_descriptor() {
+    if (fd == -1)
+        return;
+    
     if (close(fd) == -1) {
         perror("Closing file descriptor error occurred!");
     }

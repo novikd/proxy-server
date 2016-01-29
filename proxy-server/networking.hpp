@@ -61,7 +61,7 @@ private:
     file_descriptor main_socket, pipe_fd;
 
     events_queue queue;
-    bool work, stopped; // TODO: typo
+    bool work, stopped;
     
     host_resolver resolver;
     std::map<int, http_request*> requests;

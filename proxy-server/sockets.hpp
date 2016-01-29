@@ -19,7 +19,7 @@ struct file_descriptor {
     file_descriptor& operator=(const file_descriptor&) = delete;
     file_descriptor(const file_descriptor&) = delete;
     
-    file_descriptor() = default;
+    file_descriptor();
     file_descriptor(int fd);
     file_descriptor(file_descriptor&&);
 

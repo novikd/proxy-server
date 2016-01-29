@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <csignal>
 
+#include "exceptions.hpp"
 #include "host_resolver.hpp"
 
 host_resolver::host_resolver() :
@@ -34,6 +35,9 @@ int host_resolver::get_fd() const noexcept {
 }
 
 void host_resolver::push(std::unique_ptr<http_request> request) {
+    if (!work) {
+        throw custom_exception("Resolver has been already stopped!");
+    }
     std::unique_lock<std::mutex> locker{blocker};
     pending.push(std::move(request));
     cv.notify_one();
@@ -47,6 +51,9 @@ std::unique_ptr<http_request> host_resolver::pop() {
 }
 
 void host_resolver::cancel(http_request* request) {
+    if (!work) {
+        throw custom_exception("Resolver has been already stopped!");
+    }
     std::unique_lock<std::mutex> locker{blocker};
     request->cancel();
 }
@@ -72,7 +79,6 @@ void host_resolver::write_to_pipe() noexcept {
     if (write(pipe_fd.get_fd(), &tmp, sizeof(tmp)) == -1) {
         perror("Sending message to main thread error occurred!\n");
         stop();
-        raise(SIGINT); //Something is wrong. Lets stop the program
     }
 }
 

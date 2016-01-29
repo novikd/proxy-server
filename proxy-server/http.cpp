@@ -65,7 +65,7 @@ bool http_request::check_request_end(std::string const& msg) {
     
     if (i == std::string::npos)
         return false;
-    if (msg.find("POST") == std::string::npos) // TODO: WAT?
+    if (std::string{msg.cbegin(), msg.cbegin() + 4} != "POST")
         return true;
     
     size_t j = msg.find("Content-Length: ");
@@ -75,7 +75,7 @@ bool http_request::check_request_end(std::string const& msg) {
         content_length *= 10;
         content_length += (msg[j++] - '0');
     }
-    
+
     i += 4;
     return msg.substr(i).length() == content_length;
 }
@@ -139,7 +139,7 @@ http_request::~http_request() {}
 void http_request::parse_request() {
     size_t i = header.find("Host:");
     if (i == std::string::npos) {
-        std::cout << "\nBAD REQUEST FOUND\n";
+        std::cout << "\nBad request found\n";
         return;
     }
     i += 6;

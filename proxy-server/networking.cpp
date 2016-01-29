@@ -108,11 +108,11 @@ main_socket(sockets::create_listening_socket(port)),
         throw custom_exception("Creating a pipe error occurred!\n");
     }
 
-    sockets::make_nonblocking(fds[0]);
-    sockets::make_nonblocking(fds[1]);
-    
     resolver.set_fd(fds[1]);
     pipe_fd.set_fd(fds[0]);
+
+    sockets::make_nonblocking(fds[0]);
+    sockets::make_nonblocking(fds[1]);
     
     /* Event for connecting new clients */
     queue.add_event([this](struct kevent& kev) {
@@ -133,13 +133,11 @@ void proxy_server::run() {
             int amount = queue.occured();
             
             if (amount == -1) {
-                //???: stop server here?
                 perror("Getting new events error occurred!\n");
             }
             queue.execute();
         }
     } catch(...) {
-        // TODO: what is the point of this hard_stop?
         hard_stop();
     }
 }
@@ -155,6 +153,8 @@ void proxy_server::hard_stop() {
 
     // we should have some function (e.g. host_resolver::stop) that
     // returns only when all threads of resolver are terminated
+    
+    // Fixed
     work = false;
     resolver.stop();
 }
@@ -424,6 +424,7 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     char tmp;
     if (read(pipe_fd.get_fd(), &tmp, sizeof(tmp)) == -1) {
         perror("Getting message from another thread error occurred!\n");
+        hard_stop();
     }
     
     std::unique_ptr<http_request> request = resolver.pop();
