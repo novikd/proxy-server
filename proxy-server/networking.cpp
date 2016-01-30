@@ -54,41 +54,6 @@ namespace sockets {
         
         return new_socket;
     }
-    
-    int create_connect_socket(sockaddr addr) {
-        // TODO: use socket_wrap
-        int server_socket = socket(AF_INET, SOCK_STREAM, 0);
-
-        if (server_socket == -1) {
-            perror("Creating socket for server error occurred!\n");
-            return server_socket;
-        }
-        
-        const int set = 1;
-        if (setsockopt(server_socket, SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) {
-            perror("Setting server socket error occurred!\n");
-            close(server_socket);
-            return -1;
-        };
-
-        try {
-            make_nonblocking(server_socket);
-        } catch (...) {
-            close(server_socket);
-            return -1;
-        }
-        
-        std::cout << "Connecting to IP: " << inet_ntoa(((sockaddr_in*) &addr)->sin_addr) << "\nSocket: " << server_socket << "\n";
-        if (connect(server_socket, &addr, sizeof(addr)) == -1) {
-            if (errno != EINPROGRESS) {
-                close(server_socket);
-                perror("\nConnecting error occurred!");
-                return -1;
-            }
-        }
-        
-        return server_socket;
-    }
 }
 
 proxy_server::proxy_server(int port) :
@@ -450,16 +415,13 @@ void proxy_server::on_host_resolved(struct kevent& event) {
 
 
     sockaddr result = std::move(request->get_server());
-    int server_socket = sockets::create_connect_socket(result);
-    if (server_socket == -1) {
+    struct server* server;
+
+    try {
+        server = new struct server(result);
+    } catch (...) {
         client->get_buffer() = BAD_REQUEST;
         queue.add_event(client->get_fd(), EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        return;
-    }
-
-    struct server* server = new (std::nothrow) struct server(server_socket);
-    if (!server) {
-        perror("\nCreating new server error occurred!\n");
         return;
     }
     
@@ -469,7 +431,7 @@ void proxy_server::on_host_resolved(struct kevent& event) {
     servers[server->get_fd()] = server;
     queue.add_event([this](struct kevent& kev) {
         this->write_to_server(kev);
-    }, server_socket, EVFILT_WRITE, EV_ADD);
+    }, server->get_fd(), EVFILT_WRITE, EV_ADD);
 
     client->send_msg();
 }

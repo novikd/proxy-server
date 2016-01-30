@@ -16,9 +16,39 @@
 #include <exception>
 #include <vector>
 #include <cassert>
+#include <fcntl.h>
 
 #include "exceptions.hpp"
 #include "sockets.hpp"
+
+
+namespace sockets {
+    int create_connect_socket(sockaddr addr) {
+        socket_wrap server_socket{socket(AF_INET, SOCK_STREAM, 0)};
+        
+        if (server_socket.get_fd() == -1) {
+            throw custom_exception("Creating socket for server error occurred!\n");
+        }
+        
+        const int set = 1;
+        if (setsockopt(server_socket.get_fd(), SOL_SOCKET, SO_NOSIGPIPE, &set, sizeof(set)) == -1) {
+            throw custom_exception("Setting server socket error occurred!\n");
+        };
+        
+        if (fcntl(server_socket.get_fd(), F_SETFL, O_NONBLOCK) == -1) {
+            throw custom_exception("Making socket non-blocking error occurred!\n");
+        }
+
+        std::cout << "Connecting to IP: " << inet_ntoa(((sockaddr_in*) &addr)->sin_addr) << "\nSocket: " << server_socket.get_fd() << "\n";
+        if (connect(server_socket.get_fd(), &addr, sizeof(addr)) == -1) {
+            if (errno != EINPROGRESS) {
+                throw custom_exception("\nConnecting error occurred!");
+            }
+        }
+        
+        return server_socket.release();
+    }
+}
 
 /******** DESCRIPTOR ********/
 
@@ -36,12 +66,25 @@ file_descriptor::file_descriptor(int fd) :
     fd(fd)
 {}
 
+file_descriptor& file_descriptor::operator=(file_descriptor&& rhs) {
+    fd = rhs.fd;
+    rhs.fd = -1;
+
+    return *this;
+}
+
 void file_descriptor::set_fd(int new_fd) noexcept {
     fd = new_fd;
 }
 
 int file_descriptor::get_fd() const noexcept {
     return fd;
+}
+
+int file_descriptor::release() noexcept {
+    int temp = fd;
+    fd = -1;
+    return temp;
 }
 
 file_descriptor::~file_descriptor() {
@@ -187,6 +230,11 @@ client::~client() {
 
 server::server(int fd) :
     socket(fd),
+    client(nullptr)
+{}
+
+server::server(sockaddr addr) :
+    socket(sockets::create_connect_socket(addr)),
     client(nullptr)
 {}
 

@@ -22,9 +22,11 @@ struct file_descriptor {
     file_descriptor();
     file_descriptor(int fd);
     file_descriptor(file_descriptor&&);
+    file_descriptor& operator=(file_descriptor&&);
 
     void set_fd(int) noexcept;
     int get_fd() const noexcept;
+    int release() noexcept;
     
     ~file_descriptor();
     
@@ -39,6 +41,7 @@ struct socket_wrap : public file_descriptor {
     socket_wrap() = default;
     socket_wrap(int fd);
     socket_wrap(socket_wrap&&) = default;
+    socket_wrap& operator=(socket_wrap&&) = default;
     
     static socket_wrap accept(int);
     
@@ -91,6 +94,7 @@ struct server {
     server& operator=(const server&) = delete;
     
     server(int);
+    server(sockaddr);
     
     int get_fd() const noexcept;
     int get_client_fd() const noexcept;
