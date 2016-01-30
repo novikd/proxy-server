@@ -14,7 +14,7 @@ set(SOURCE_FILES
 "proxy-server/event_queue.hpp"
 "proxy-server/server.cpp"
 "proxy-server/lru_cache.hpp"
-"proxy-server/socket_exception.hpp"
+"proxy-server/exceptions.hpp"
 "proxy-server/host_resolver.hpp"
 "proxy-server/host_resolver.cpp")
 
