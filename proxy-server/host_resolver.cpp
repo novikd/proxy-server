@@ -19,10 +19,21 @@
 host_resolver::host_resolver() :
     work(true)
 {
-    for (int i = 0; i < 4; ++i) {
-        threads.push_back(std::thread([this]() {
-            this->resolve();
-        }));
+    int i;
+    try {
+        for (i = 0; i < 4; ++i) {
+            threads.push_back(std::thread([this]() {
+                this->resolve();
+            }));
+        }
+    } catch (...) {
+        work = false;
+        cv.notify_all();
+        for (int j = 0; j < i; ++j) {
+            if (threads[j].joinable())
+                threads[j].join();
+        }
+        throw;
     }
 }
 
