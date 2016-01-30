@@ -56,6 +56,7 @@ namespace sockets {
     }
     
     int create_connect_socket(sockaddr addr) {
+        // TODO: use socket_wrap
         int server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
         if (server_socket == -1) {

@@ -78,7 +78,9 @@ void host_resolver::write_to_pipe() noexcept {
     std::unique_lock<std::mutex> locker{blocker};
     if (write(pipe_fd.get_fd(), &tmp, sizeof(tmp)) == -1) {
         perror("Sending message to main thread error occurred!\n");
-        stop();
+        stop(); // TODO: fix deadlock and joining to itself
+        // TODO: probably we can abort here, but we probably (?)
+        // should handle the case when pipe is full
     }
 }
 
